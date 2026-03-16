@@ -1,4 +1,4 @@
-using AIAdventChallenge.Logic;
+using AIAdventChallenge.Infrastructure;
 
 namespace AIAdventChallenge.Handlers;
 

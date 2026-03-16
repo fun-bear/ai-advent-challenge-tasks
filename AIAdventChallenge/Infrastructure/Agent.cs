@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using AIAdventChallenge.Models;
 
-namespace AIAdventChallenge.Logic;
+namespace AIAdventChallenge.Infrastructure;
 
 public class Agent : IDisposable
 {
