@@ -40,10 +40,11 @@ public static class Day01TaskHandler
     {
         var settings = configuration.GetSection("OpenAISettings");
         var apiKey = settings["ApiKey"] ?? throw new InvalidOperationException("OpenAISettings:ApiKey is missing.");
-        var model = settings["Model"] ?? throw new InvalidOperationException("OpenAISettings:Model is missing.");
+        var modelName = settings["ModelName"] ?? throw new InvalidOperationException("OpenAISettings:ModelName is missing.");
         var baseUrl = settings["BaseUrl"] ?? throw new InvalidOperationException("OpenAISettings:BaseUrl is missing.");
-        
-        using var agent = new Agent(baseUrl, apiKey, model, SYSTEM_PROMPT);
+
+        var modelSettings = new AIModelSettings(modelName);
+        using var agent = new Agent(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
         var now = DateTimeOffset.Now;
         var userMessage = $"Текущая дата и время: {now:yyyy-MM-dd HH:mm}. Составь плейлист на основе этих данных.";
 

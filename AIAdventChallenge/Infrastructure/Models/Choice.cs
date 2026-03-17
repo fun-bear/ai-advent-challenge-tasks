@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace AIAdventChallenge.Models;
+namespace AIAdventChallenge.Infrastructure.Models;
 
 public record Choice(
     [property: JsonPropertyName("message")] ChatMessage Message

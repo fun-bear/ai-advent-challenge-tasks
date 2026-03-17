@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace AIAdventChallenge.Models;
+namespace AIAdventChallenge.Infrastructure.Models;
 
 public record ChatMessage(
     [property: JsonPropertyName("role")] string Role,

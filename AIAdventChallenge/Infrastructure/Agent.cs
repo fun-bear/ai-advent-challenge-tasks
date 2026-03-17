@@ -1,25 +1,27 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using AIAdventChallenge.Models;
+using System.Text.Json.Serialization;
+using AIAdventChallenge.Infrastructure.Models;
 
 namespace AIAdventChallenge.Infrastructure;
 
 public class Agent : IDisposable
 {
     private readonly HttpClient _http;
-    private readonly string _model;
+    private readonly AIModelSettings _modelSettings;
     private readonly string _systemPrompt;
     private List<ChatMessage> _history = [];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public Agent(string baseAddress, string apiKey, string model, string systemPrompt)
+    public Agent(string baseAddress, string apiKey, AIModelSettings modelSettings, string systemPrompt)
     {
-        _model = model;
+        _modelSettings = modelSettings;
         _systemPrompt = systemPrompt;
 
         _http = new HttpClient { BaseAddress = new Uri(baseAddress) };
@@ -33,7 +35,13 @@ public class Agent : IDisposable
     {
         _history.Add(new ChatMessage("user", userMessage));
 
-        var json = JsonSerializer.Serialize(new ChatRequest(_model, _history), JsonOptions);
+        var request = new ChatRequest(
+            _modelSettings.ModelName,
+            _history,
+            _modelSettings.MaxTokens,
+            _modelSettings.Temperature);
+
+        var json = JsonSerializer.Serialize(request, JsonOptions);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var httpResponse = await _http.PostAsync("chat/completions", content);
