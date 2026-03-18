@@ -10,7 +10,7 @@ public class Agent : IDisposable
 {
     private readonly HttpClient _http;
     private readonly AIModelSettings _modelSettings;
-    private readonly string _systemPrompt;
+    private readonly string? _systemPrompt;
     private List<ChatMessage> _history = [];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -19,7 +19,7 @@ public class Agent : IDisposable
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public Agent(string baseAddress, string apiKey, AIModelSettings modelSettings, string systemPrompt)
+    public Agent(string baseAddress, string apiKey, AIModelSettings modelSettings, string? systemPrompt = null)
     {
         _modelSettings = modelSettings;
         _systemPrompt = systemPrompt;
@@ -57,7 +57,9 @@ public class Agent : IDisposable
     }
 
     public void Reset() =>
-        _history = [new ChatMessage("system", _systemPrompt)];
+        _history = _systemPrompt is null
+            ? []
+            : [new ChatMessage("system", _systemPrompt)];
 
     public void Dispose() => _http.Dispose();
 }
