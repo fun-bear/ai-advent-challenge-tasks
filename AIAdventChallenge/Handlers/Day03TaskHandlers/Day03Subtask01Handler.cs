@@ -20,6 +20,7 @@ public static class Day03Subtask01Handler
         using var agent = new Agent(baseUrl, apiKey, modelSettings);
         var userMessage = Day03TaskDescriptions.TASK_DESCRIPTION;
 
-        return await agent.ChatAsync(userMessage);
+        var result = await agent.ChatAsync(userMessage);
+        return result.Content;
     }
 }

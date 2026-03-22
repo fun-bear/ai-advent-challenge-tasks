@@ -31,7 +31,7 @@ public class Agent : IDisposable
         Reset();
     }
 
-    public async Task<string> ChatAsync(string userMessage)
+    public async Task<ChatResult> ChatAsync(string userMessage)
     {
         _history.Add(new ChatMessage("user", userMessage));
 
@@ -51,9 +51,10 @@ public class Agent : IDisposable
         var response = JsonSerializer.Deserialize<ChatResponse>(body, JsonOptions)!;
 
         var assistantText = response.Choices[0].Message.Content;
+        var totalTokens = response.Usage?.TotalTokens ?? 0;
         _history.Add(new ChatMessage("assistant", assistantText));
 
-        return assistantText;
+        return new ChatResult(assistantText, totalTokens);
     }
 
     public void Reset() =>

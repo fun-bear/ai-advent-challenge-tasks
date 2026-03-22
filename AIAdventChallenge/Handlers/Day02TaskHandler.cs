@@ -84,15 +84,18 @@ public static class Day02TaskHandler
 
         var now = DateTimeOffset.Now;
         var userMessage = $"Текущая дата и время: {now:yyyy-MM-dd HH:mm}. Составь рекомендации по выбору одежды на основе этих данных.";
-
         var withoutRestrictionsTask = agentWithoutRestrictions.ChatAsync(userMessage);
+
         var withRestrictionsTask = agentWithRestrictions.ChatAsync(userMessage);
 
         await Task.WhenAll(withoutRestrictionsTask, withRestrictionsTask);
 
+        var withoutRestrictionsResult = await withoutRestrictionsTask;
+        var withRestrictionsResult = await withRestrictionsTask;
+
         return new Day02TaskResult(
-            WithoutRestrictions: await withoutRestrictionsTask,
-            WithRestrictions: await withRestrictionsTask);
+            WithoutRestrictions: withoutRestrictionsResult.Content,
+            WithRestrictions: withRestrictionsResult.Content);
     }
     
     private static Agent CreateAgentWithoutRestrictions(string baseUrl, string apiKey, string modelName)

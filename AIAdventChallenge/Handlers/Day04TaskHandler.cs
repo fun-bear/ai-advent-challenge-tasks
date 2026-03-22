@@ -69,12 +69,12 @@ public static class Day04TaskHandler
         await Task.WhenAll(zeroTask, mediumTask, highTask, newModelTask);
 
         var oldModel = new Day04TaskOldModel(
-            Temperature0: await zeroTask,
-            Temperature07: await mediumTask,
-            Temperature12: await highTask);
+            Temperature0: (await zeroTask).Content,
+            Temperature07: (await mediumTask).Content,
+            Temperature12: (await highTask).Content);
 
         var newModel = new Day04TaskNewModel(
-            Result: await newModelTask);
+            Result: (await newModelTask).Content);
 
         return new Day04TaskResult(
             OldModel: oldModel,

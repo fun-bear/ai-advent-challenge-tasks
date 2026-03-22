@@ -38,15 +38,15 @@ public static class Day03Subtask03Handler
 
         var taskModelSettings = new AIModelSettings(TASK_MODEL);
         using var taskAgent = new Agent(baseUrl, apiKey, taskModelSettings);
-        var taskSolution = await taskAgent.ChatAsync(prompt);
+        var taskSolution = await taskAgent.ChatAsync(prompt.Content);
 
-        return 
+        return
         $"""
         СГЕНЕРИРОВАННЫЙ ПРОМПТ:
-        {prompt}
+        {prompt.Content}
 
         РЕШЕНИЕ ЗАДАЧИ:
-        {taskSolution}
+        {taskSolution.Content}
         """;
     }
 }

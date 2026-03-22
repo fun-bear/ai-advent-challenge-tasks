@@ -48,6 +48,7 @@ public static class Day01TaskHandler
         var now = DateTimeOffset.Now;
         var userMessage = $"Текущая дата и время: {now:yyyy-MM-dd HH:mm}. Составь плейлист на основе этих данных.";
 
-        return await agent.ChatAsync(userMessage);
+        var result = await agent.ChatAsync(userMessage);
+        return result.Content;
     }
 }

@@ -25,6 +25,7 @@ public static class Day03Subtask02Handler
         Решай задачу пошагово.
         """;
 
-        return await agent.ChatAsync(userMessage);
+        var result = await agent.ChatAsync(userMessage);
+        return result.Content;
     }
 }
