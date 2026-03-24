@@ -62,5 +62,17 @@ public class Agent : IDisposable
             ? []
             : [new ChatMessage("system", _systemPrompt)];
 
+    public IReadOnlyList<ChatMessage> ExportHistory() =>
+        _history
+            .Select(m => new ChatMessage(m.Role, m.Content))
+            .ToList();
+
+    public void ImportHistory(IEnumerable<ChatMessage> history)
+    {
+        _history = history
+            .Select(m => new ChatMessage(m.Role, m.Content))
+            .ToList();
+    }
+
     public void Dispose() => _http.Dispose();
 }
