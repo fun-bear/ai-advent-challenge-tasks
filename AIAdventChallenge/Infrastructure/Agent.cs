@@ -52,9 +52,10 @@ public class Agent : IDisposable
 
         var assistantText = response.Choices[0].Message.Content;
         var totalTokens = response.Usage?.TotalTokens ?? 0;
+        var outputTokens = response.Usage?.CompletionTokens ?? 0;
         _history.Add(new ChatMessage("assistant", assistantText));
 
-        return new ChatResult(assistantText, totalTokens);
+        return new ChatResult(assistantText, totalTokens, outputTokens);
     }
 
     public void Reset() =>

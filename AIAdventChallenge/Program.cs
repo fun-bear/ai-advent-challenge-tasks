@@ -30,5 +30,6 @@ app.MapGet("/day05/task", (IConfiguration configuration, AIAdventChallenge.ViewM
     Day05TaskHandler.HandleAsync(configuration, power));
 app.MapGet("/day06/task", Day06TaskHandler.HandleAsync);
 app.MapGet("/day07/task", Day07TaskHandler.HandleAsync);
+app.MapGet("/day08/task", Day08TaskHandler.HandleAsync);
 
 app.Run();
