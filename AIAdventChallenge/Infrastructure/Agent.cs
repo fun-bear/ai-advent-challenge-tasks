@@ -75,5 +75,11 @@ public class Agent : IDisposable
             .ToList();
     }
 
+    public void AddHistory(IEnumerable<ChatMessage> history)
+    {
+        _history.AddRange(
+            history.Select(m => new ChatMessage(m.Role, m.Content)));
+    }
+
     public void Dispose() => _http.Dispose();
 }

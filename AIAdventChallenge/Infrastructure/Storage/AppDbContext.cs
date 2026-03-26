@@ -9,6 +9,7 @@ public class AppDbContext : DbContext
     }
 
     public DbSet<AgentHistoryEntry> AgentHistoryEntries => Set<AgentHistoryEntry>();
+    public DbSet<AgentSummaryEntry> AgentSummaryEntries => Set<AgentSummaryEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,6 +23,17 @@ public class AppDbContext : DbContext
             entity.Property(x => x.Content).IsRequired();
 
             entity.HasIndex(x => new { x.AgentKey, x.SortOrder });
+        });
+
+        modelBuilder.Entity<AgentSummaryEntry>(entity =>
+        {
+            entity.ToTable("AgentSummary");
+            entity.HasKey(x => x.Id);
+
+            entity.Property(x => x.AgentKey).IsRequired();
+            entity.Property(x => x.Summary).IsRequired();
+
+            entity.HasIndex(x => x.AgentKey).IsUnique();
         });
     }
 }
