@@ -46,8 +46,6 @@ public static class Day08TaskHandler
         var modelSettings = new AIModelSettings(MODEL_NAME);
         using var agent = new Agent(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
 
-        var userMessage = message;
-
         var persistedHistory = await LoadHistoryAsync(dbContext);
         if (persistedHistory.Count > 0)
         {
