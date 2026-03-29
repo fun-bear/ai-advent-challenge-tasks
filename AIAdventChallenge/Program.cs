@@ -1,5 +1,6 @@
 using AIAdventChallenge.Handlers;
 using AIAdventChallenge.Handlers.Day03TaskHandlers;
+using AIAdventChallenge.Handlers.Day10TaskHandlers;
 using AIAdventChallenge.Infrastructure.Storage;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -32,5 +33,8 @@ app.MapGet("/day06/task", Day06TaskHandler.HandleAsync);
 app.MapGet("/day07/task", Day07TaskHandler.HandleAsync);
 app.MapGet("/day08/task", Day08TaskHandler.HandleAsync);
 app.MapGet("/day09/task", Day09TaskHandler.HandleAsync);
+app.MapGet("/day10/subtask01", Day10Subtask01Handler.HandleAsync);
+app.MapGet("/day10/subtask02", Day10Subtask02Handler.HandleAsync);
+app.MapGet("/day10/subtask03", Day10Subtask03Handler.HandleAsync);
 
 app.Run();
