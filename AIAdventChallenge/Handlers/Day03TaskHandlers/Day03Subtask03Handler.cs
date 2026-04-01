@@ -19,7 +19,7 @@ public static class Day03Subtask03Handler
         var baseUrl = settings["BaseUrl"] ?? throw new InvalidOperationException("OpenAISettings:BaseUrl is missing.");
 
         var promptModelSettings = new AIModelSettings(PROMPT_MODEL);
-        using var promptAgent = new Agent(baseUrl, apiKey, promptModelSettings);
+        using var promptAgent = new LLMClient(baseUrl, apiKey, promptModelSettings);
         var promptUserMessage = 
         $"""
         Нам дана такая задача (находится в блоке между *** и ***):
@@ -37,7 +37,7 @@ public static class Day03Subtask03Handler
         var prompt = await promptAgent.ChatAsync(promptUserMessage);
 
         var taskModelSettings = new AIModelSettings(TASK_MODEL);
-        using var taskAgent = new Agent(baseUrl, apiKey, taskModelSettings);
+        using var taskAgent = new LLMClient(baseUrl, apiKey, taskModelSettings);
         var taskSolution = await taskAgent.ChatAsync(prompt.Content);
 
         return

@@ -42,17 +42,17 @@ public static class Day07TaskHandler
         var baseUrl = settings["BaseUrl"] ?? throw new InvalidOperationException("OpenAISettings:BaseUrl is missing.");
 
         var modelSettings = new AIModelSettings(modelName);
-        using var agent = new Agent(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
+        using var llmClient = new LLMClient(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
 
         var persistedHistory = await LoadHistoryAsync(dbContext);
         if (persistedHistory.Count > 0)
         {
-            agent.ImportHistory(persistedHistory);
+            llmClient.ImportHistory(persistedHistory);
         }
 
-        var result = await agent.ChatAsync($"Добавь покупку: {product}.");
+        var result = await llmClient.ChatAsync($"Добавь покупку: {product}.");
 
-        await SaveHistoryAsync(dbContext, agent.ExportHistory());
+        await SaveHistoryAsync(dbContext, llmClient.ExportHistory());
 
         return Results.Ok(result.Content);
     }

@@ -44,11 +44,11 @@ public static class Day01TaskHandler
         var baseUrl = settings["BaseUrl"] ?? throw new InvalidOperationException("OpenAISettings:BaseUrl is missing.");
 
         var modelSettings = new AIModelSettings(modelName);
-        using var agent = new Agent(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
+        using var llmClient = new LLMClient(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
         var now = DateTimeOffset.Now;
         var userMessage = $"Текущая дата и время: {now:yyyy-MM-dd HH:mm}. Составь плейлист на основе этих данных.";
 
-        var result = await agent.ChatAsync(userMessage);
+        var result = await llmClient.ChatAsync(userMessage);
         return result.Content;
     }
 }

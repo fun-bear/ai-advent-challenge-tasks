@@ -32,7 +32,7 @@ public static class Day10Subtask01Handler
         var baseUrl = settings["BaseUrl"] ?? throw new InvalidOperationException("OpenAISettings:BaseUrl is missing.");
 
         var modelSettings = new AIModelSettings(modelName);
-        using var agent = new Agent(baseUrl, apiKey, modelSettings, Day10TaskDescriptions.SYSTEM_PROMPT);
+        using var llmClient = new LLMClient(baseUrl, apiKey, modelSettings, Day10TaskDescriptions.SYSTEM_PROMPT);
 
         var persistedHistory = await LoadHistoryAsync(dbContext);
         if (persistedHistory.Count == 0) // Init history
@@ -42,11 +42,11 @@ public static class Day10Subtask01Handler
                 .ToList();
         }
 
-        agent.AddHistory(persistedHistory);
+        llmClient.AddHistory(persistedHistory);
 
-        var chatResult = await agent.ChatAsync(message);
+        var chatResult = await llmClient.ChatAsync(message);
 
-        var lastMessagesHistory = agent.ExportHistory()
+        var lastMessagesHistory = llmClient.ExportHistory()
             .Skip(1) // Skip system prompt (0)
             .TakeLast(SLIDING_WINDOW_SIZE)
             .ToList();

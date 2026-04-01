@@ -87,15 +87,15 @@ public static class Day12TaskHandler
 
         var systemPrompt = string.Format(SYSTEM_PROMPT_TEMPLATE, profileDescription);
 
-        using var agent = new Agent(baseUrl, apiKey, modelSettings, systemPrompt);
+        using var llmClient = new LLMClient(baseUrl, apiKey, modelSettings, systemPrompt);
         if (persistedHistory.Count > 0)
         {
-            agent.AddHistory(persistedHistory);
+            llmClient.AddHistory(persistedHistory);
         }
 
-        var result = await agent.ChatAsync(message);
+        var result = await llmClient.ChatAsync(message);
 
-        var historyToSave = agent.ExportHistory()
+        var historyToSave = llmClient.ExportHistory()
             .Skip(1) // Skip system prompt (0)
             .TakeLast(SLIDING_WINDOW_SIZE)
             .ToList();
@@ -140,7 +140,7 @@ public static class Day12TaskHandler
         string currentProfile,
         IReadOnlyList<string> recentUserMessages)
     {
-        using var profileAgent = new Agent(baseUrl, apiKey, modelSettings, PROFILE_AGENT_SYSTEM_PROMPT);
+        using var profileAgent = new LLMClient(baseUrl, apiKey, modelSettings, PROFILE_AGENT_SYSTEM_PROMPT);
 
         var request =
             $"Текущий профиль пользователя:\n{currentProfile}\n\n" +

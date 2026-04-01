@@ -40,24 +40,24 @@ public static class Day09TaskHandler
         var baseUrl = settings["BaseUrl"] ?? throw new InvalidOperationException("OpenAISettings:BaseUrl is missing.");
 
         var modelSettings = new AIModelSettings(modelName);
-        using var agent = new Agent(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
+        using var llmClient = new LLMClient(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
 
         var summaryEntry = await dbContext.AgentSummaryEntries
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.AgentKey == RECENT_HISTORY_AGENT_KEY);
 
         var summary = summaryEntry?.Summary;
-        await agent.ChatAsync($"Краткое содержание предыдущего разговора: {summary ?? "еще нет"}");
+        await llmClient.ChatAsync($"Краткое содержание предыдущего разговора: {summary ?? "еще нет"}");
 
         var persistedHistory = await LoadHistoryAsync(dbContext, RECENT_HISTORY_AGENT_KEY);
         if (persistedHistory.Count > 0)
         {
-            agent.AddHistory(persistedHistory);
+            llmClient.AddHistory(persistedHistory);
         }
 
-        var chatResult = await agent.ChatAsync(message);
+        var chatResult = await llmClient.ChatAsync(message);
 
-        var lastMessagesHistory = agent.ExportHistory()
+        var lastMessagesHistory = llmClient.ExportHistory()
             .Where((_, index) => index > 2) // Skip system prompt (0) and summary chat messages (1, 2)
             .ToList();
 
@@ -151,7 +151,7 @@ public static class Day09TaskHandler
 
     private static async Task<string> CompressSummaryAsync(string baseUrl, string apiKey, string modelName, string combinedContent)
     {
-        using var summaryAgent = new Agent(baseUrl, apiKey, new AIModelSettings(modelName), SUMMARY_PROMPT);
+        using var summaryAgent = new LLMClient(baseUrl, apiKey, new AIModelSettings(modelName), SUMMARY_PROMPT);
         var summaryResult = await summaryAgent.ChatAsync(combinedContent);
         return summaryResult.Content;
     }

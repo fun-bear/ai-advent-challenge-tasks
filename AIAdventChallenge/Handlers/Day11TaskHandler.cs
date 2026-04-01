@@ -76,7 +76,7 @@ public static class Day11TaskHandler
         var baseUrl = settings["BaseUrl"] ?? throw new InvalidOperationException("OpenAISettings:BaseUrl is missing.");
 
         var modelSettings = new AIModelSettings(modelName);
-        using var agent = new Agent(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
+        using var llmClient = new LLMClient(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
 
         var userMessage = message.Trim().ToLower();
 
@@ -112,7 +112,7 @@ public static class Day11TaskHandler
         aiRequest += $"- Рабочее ограничение: {workingMemory.GetValueOrDefault("ограничение", "не задано")}\n";
         aiRequest += $"- Долговременная: {string.Join(", ", longTermMemory.Values)}";
 
-        var result = await agent.ChatAsync(aiRequest);
+        var result = await llmClient.ChatAsync(aiRequest);
 
         // 5. Сохраняем ответ в краткосрочную память
         AddToShortTermMemory(result.Content);

@@ -44,14 +44,14 @@ public static class Day10Subtask02Handler
         Факты ТЗ собираем из истории чата в категории: цели, ограничения, предпочтения. Прочие категории отбрасываем.
         Новые факты нужно объединить с ранее предоставленными. Если факты не изменились, то нужно вывести имеющиеся факты.
         """;
-        using var agent = new Agent(baseUrl, apiKey, modelSettings, updatedSystemPrompt);
+        using var llmClient = new LLMClient(baseUrl, apiKey, modelSettings, updatedSystemPrompt);
 
         var factsEntry = await dbContext.AgentSummaryEntries
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.AgentKey == AGENT_KEY);
 
         var facts = factsEntry?.Summary;
-        await agent.ChatAsync($"Текущие факты ТЗ: {facts ?? "еще нет"}");
+        await llmClient.ChatAsync($"Текущие факты ТЗ: {facts ?? "еще нет"}");
 
         var persistedHistory = await LoadHistoryAsync(dbContext);
         if (persistedHistory.Count == 0) // Init history
@@ -61,18 +61,18 @@ public static class Day10Subtask02Handler
                 .ToList();
         }
 
-        agent.AddHistory(persistedHistory);
+        llmClient.AddHistory(persistedHistory);
 
-        var chatResult = await agent.ChatAsync(message);
+        var chatResult = await llmClient.ChatAsync(message);
 
-        var lastMessagesHistory = agent.ExportHistory()
+        var lastMessagesHistory = llmClient.ExportHistory()
             .Where((_, index) => index > 2) // Skip system prompt (0) and facts chat messages (1, 2)
             .TakeLast(KEEP_LAST_MESSAGES)
             .ToList();
 
         await SaveHistoryAsync(dbContext, lastMessagesHistory);
 
-        var factsResult = await agent.ChatAsync(FACTS_COMPILATION_REQUEST);
+        var factsResult = await llmClient.ChatAsync(FACTS_COMPILATION_REQUEST);
         await SaveFactsAsync(dbContext, factsResult.Content);
 
         return Results.Ok(new

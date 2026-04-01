@@ -98,15 +98,15 @@ public static class Day02TaskHandler
             WithRestrictions: withRestrictionsResult.Content);
     }
     
-    private static Agent CreateAgentWithoutRestrictions(string baseUrl, string apiKey, string modelName)
+    private static LLMClient CreateAgentWithoutRestrictions(string baseUrl, string apiKey, string modelName)
     {
         var modelSettings = new AIModelSettings(modelName);
-        return new Agent(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT_WITHOUT_RESTRICTIONS);
+        return new LLMClient(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT_WITHOUT_RESTRICTIONS);
     }
 
-    private static Agent CreateAgentWithRestrictions(string baseUrl, string apiKey, string modelName)
+    private static LLMClient CreateAgentWithRestrictions(string baseUrl, string apiKey, string modelName)
     {
         var modelSettings = new AIModelSettings(modelName, MAX_TOKENS, TEMPERATURE);
-        return new Agent(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT_WITH_RESTRICTIONS);
+        return new LLMClient(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT_WITH_RESTRICTIONS);
     }
 }

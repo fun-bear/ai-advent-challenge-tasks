@@ -42,7 +42,7 @@ public static class Day10Subtask03Handler
         var baseUrl = settings["BaseUrl"] ?? throw new InvalidOperationException("OpenAISettings:BaseUrl is missing.");
 
         var modelSettings = new AIModelSettings(modelName);
-        using var agent = new Agent(baseUrl, apiKey, modelSettings, Day10TaskDescriptions.SYSTEM_PROMPT);
+        using var llmClient = new LLMClient(baseUrl, apiKey, modelSettings, Day10TaskDescriptions.SYSTEM_PROMPT);
 
         var branchAgentKey = branch == 1 ? AGENT_KEY_BRANCH_1 : AGENT_KEY_BRANCH_2;
 
@@ -54,11 +54,11 @@ public static class Day10Subtask03Handler
                 .ToList();
         }
 
-        agent.AddHistory(persistedHistory);
+        llmClient.AddHistory(persistedHistory);
 
-        var chatResult = await agent.ChatAsync(message);
+        var chatResult = await llmClient.ChatAsync(message);
 
-        var lastMessagesHistory = agent.ExportHistory()
+        var lastMessagesHistory = llmClient.ExportHistory()
             .Skip(1) // Skip system prompt (0)
             .ToList();
 

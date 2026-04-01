@@ -57,7 +57,7 @@ public static class Day04TaskHandler
         using var agentHigh = CreateOldAgent(baseUrl, apiKey, TEMPERATURE_HIGH);
         
         var modelSettings = new AIModelSettings(modelName);
-        using var newAgent = new Agent(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT_NEW_MODEL);
+        using var newAgent = new LLMClient(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT_NEW_MODEL);
 
         var userMessage = "Название книги: Четверг обитания";
 
@@ -81,9 +81,9 @@ public static class Day04TaskHandler
             NewModel: newModel);
     }
 
-    private static Agent CreateOldAgent(string baseUrl, string apiKey, decimal temperature)
+    private static LLMClient CreateOldAgent(string baseUrl, string apiKey, decimal temperature)
     {
         var modelSettings = new AIModelSettings(OLD_MODEL_NAME, Temperature: temperature);
-        return new Agent(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT_OLD_MODEL);
+        return new LLMClient(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT_OLD_MODEL);
     }
 }

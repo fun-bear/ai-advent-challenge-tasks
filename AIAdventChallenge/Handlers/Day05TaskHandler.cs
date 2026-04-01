@@ -31,7 +31,7 @@ public static class Day05TaskHandler
         var baseUrl = settings["BaseUrl"] ?? throw new InvalidOperationException("OpenAISettings:BaseUrl is missing.");
 
         var modelSettings = CreateModelSettings(power);
-        using var agent = new Agent(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
+        using var llmClient = new LLMClient(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
         var userMessage = 
         """
         Доктор Квик приехал в магазин рано утром. Управляющий уже ждал его у входа.
@@ -48,7 +48,7 @@ public static class Day05TaskHandler
         """;
 
         var stopwatch = Stopwatch.StartNew();
-        var result = await agent.ChatAsync(userMessage);
+        var result = await llmClient.ChatAsync(userMessage);
         stopwatch.Stop();
 
         return new Day05TaskResult(

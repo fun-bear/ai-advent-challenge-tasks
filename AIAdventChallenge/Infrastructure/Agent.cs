@@ -6,7 +6,7 @@ using AIAdventChallenge.Infrastructure.Models;
 
 namespace AIAdventChallenge.Infrastructure;
 
-public class Agent : IDisposable
+public class LLMClient : IDisposable
 {
     private readonly HttpClient _http;
     private readonly AIModelSettings _modelSettings;
@@ -19,7 +19,7 @@ public class Agent : IDisposable
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public Agent(string baseAddress, string apiKey, AIModelSettings modelSettings, string? systemPrompt = null)
+    public LLMClient(string baseAddress, string apiKey, AIModelSettings modelSettings, string? systemPrompt = null)
     {
         _modelSettings = modelSettings;
         _systemPrompt = systemPrompt;
