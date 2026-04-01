@@ -37,5 +37,6 @@ app.MapGet("/day10/subtask01", Day10Subtask01Handler.HandleAsync);
 app.MapGet("/day10/subtask02", Day10Subtask02Handler.HandleAsync);
 app.MapGet("/day10/subtask03", Day10Subtask03Handler.HandleAsync);
 app.MapGet("/day11/task", Day11TaskHandler.HandleAsync);
+app.MapGet("/day12/task", Day12TaskHandler.HandleAsync);
 
 app.Run();
