@@ -10,7 +10,7 @@ public class LLMClient : IDisposable
 {
     private readonly HttpClient _http;
     private readonly AIModelSettings _modelSettings;
-    private readonly string? _systemPrompt;
+    private string? _systemPrompt;
     private List<ChatMessage> _history = [];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -62,6 +62,13 @@ public class LLMClient : IDisposable
         _history = _systemPrompt is null
             ? []
             : [new ChatMessage("system", _systemPrompt)];
+
+    public void SetSystemPrompt(string? systemPrompt)
+    {
+        _systemPrompt = systemPrompt;
+
+        Reset();
+    }
 
     public IReadOnlyList<ChatMessage> ExportHistory() =>
         _history

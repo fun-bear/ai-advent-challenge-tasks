@@ -1,3 +1,5 @@
+using AIAdventChallenge.Logic.Models;
+
 namespace AIAdventChallenge.Logic;
 
 public class AgentState

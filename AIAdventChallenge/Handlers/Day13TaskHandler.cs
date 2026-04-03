@@ -26,7 +26,8 @@ public static class Day13TaskHandler
 
         var modelSettings = new AIModelSettings(modelName);
         using var llmClient = new LLMClient(baseUrl, apiKey, modelSettings);
-        using var stateAgent = new StateAgent(llmClient);
+        var invariants = new InvariantCollection();
+        using var stateAgent = new StateAgent(llmClient, invariants);
 
         var task = stateAgent.RunAsync(query);
 
