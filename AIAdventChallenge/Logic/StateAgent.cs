@@ -54,7 +54,9 @@ public class StateAgent : IDisposable
 
         Запрос пользователя: "{userMessage}"
 
-        Ответь СТРОГО в формате:
+        Ответь СТРОГО в формате (на каждый нарушенный инвариант - новый VIOLATION):
+        VIOLATION: <название инварианта> | <почему нарушается>
+        VIOLATION: <название инварианта> | <почему нарушается>
         VIOLATION: <название инварианта> | <почему нарушается>
         ——или——
         OK
@@ -71,9 +73,9 @@ public class StateAgent : IDisposable
         {
             Log("⚠️ Не могу выполнить этот запрос. Вот почему:");
 
-            foreach (var v in violations.OrderByDescending(x => x.Invariant.Priority))
+            foreach (var v in violations)
             {
-                Log($"🚫 [{v.Invariant.Category}] {v.Invariant.Name}");
+                Log($"🚫 {v.Name}");
                 Log($"   {v.Explanation}");
             }
         }
@@ -91,32 +93,25 @@ public class StateAgent : IDisposable
 
         foreach (var line in checkResult.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
-            if (!line.TrimStart().StartsWith("VIOLATION:", StringComparison.OrdinalIgnoreCase))
+            var trimmedLine = line.Trim();
+
+            if (!trimmedLine.StartsWith("VIOLATION:", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var parts = line["VIOLATION:".Length..].Split('|', 2);
+            var parts = trimmedLine["VIOLATION:".Length..].Split('|', 2);
             if (parts.Length < 2) continue;
 
-            var name = parts[0].Trim();
-            var explanation = parts[1].Trim();
-
-            var invariant = _invariants.GetAll()
-                .FirstOrDefault(i => i.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-
-            if (invariant is not null)
+            violations.Add(new InvariantViolation
             {
-                violations.Add(new InvariantViolation
-                {
-                    Invariant = invariant,
-                    Explanation = explanation
-                });
-            }
+                Name = parts[0].Trim(),
+                Explanation = parts[1].Trim()
+            });
         }
 
         return (violations.Count > 0, violations);
     }
 
-    public async Task RunAsync(string userQuery)
+    public async Task RunAsync(string userQuery, bool checkInvariantBeforeStart = false)
     {
         _state.UserQuery = userQuery;
 
@@ -125,7 +120,7 @@ public class StateAgent : IDisposable
         var systemPrompt = BuildSystemPrompt();
         _llm.SetSystemPrompt(systemPrompt);
 
-        if (await HasViolations())
+        if (checkInvariantBeforeStart && await HasViolations())
         {
             return;
         }

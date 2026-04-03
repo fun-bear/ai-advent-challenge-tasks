@@ -5,6 +5,6 @@ namespace AIAdventChallenge.Logic.Models;
 /// </summary>
 public class InvariantViolation
 {
-    public Invariant Invariant { get; init; } = null!;
+    public string Name { get; init; } = string.Empty;
     public string Explanation { get; init; } = string.Empty;
 }
