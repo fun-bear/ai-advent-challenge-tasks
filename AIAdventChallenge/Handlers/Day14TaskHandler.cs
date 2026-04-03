@@ -6,8 +6,7 @@ namespace AIAdventChallenge.Handlers;
 
 /// <summary>
 /// День 14.
-/// Агент с контролем инвариантов: запускает StateAgent с query,
-/// выполняет паузу/возобновление и возвращает накопленный строковый лог.
+/// Агент с контролем инвариантов.
 /// </summary>
 public static class Day14TaskHandler
 {
