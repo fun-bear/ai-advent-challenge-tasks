@@ -27,6 +27,9 @@ public static class Day15TaskHandler
         TryTransition(state, Stage.Planning, Log);
         TryTransition(state, Stage.Execution, Log);
 
+        state.Pause();
+        state.Resume();
+
         Log("⚠️ Пробуем выполнить переход напрямую: Execution -> Done");
         var movedToDone = state.TransitionTo(Stage.Done);
         Log(movedToDone
