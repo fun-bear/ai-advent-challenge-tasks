@@ -6,7 +6,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Регистрируем MCP сервер
 builder.Services.AddMcpServer()
     .WithHttpTransport()       // HTTP транспорт
-    .WithTools<HelloTool>();
+    .WithTools<HelloTool>()
+    .WithTools<NominatimOpenStreetMapTool>();
 
 var app = builder.Build();
 
