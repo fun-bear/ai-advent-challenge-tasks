@@ -20,6 +20,7 @@ builder.Services.AddMcpServer()
     .WithHttpTransport()       // HTTP транспорт
     .WithTools<HelloTool>()
     .WithTools<PingTool>()
+    .WithTools<MoonTelegramTool>()
     .WithTools<NominatimOpenStreetMapTool>();
 
 var app = builder.Build();
