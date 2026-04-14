@@ -1,0 +1,535 @@
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
+
+namespace AIAdventChallenge.Handlers;
+
+/// <summary>
+/// День 21.
+/// Индексация документов из папки Documents с двумя стратегиями чанкинга и эмбеддингами через локальный Ollama.
+/// </summary>
+public static partial class Day21TaskHandler
+{
+    private const string SourceName = "Documents";
+    private const string OllamaEmbeddingModel = "nomic-embed-text";
+    private const int FixedChunkSize = 1200;
+    private const int FixedChunkOverlap = 200;
+    private const int StructuredChunkSize = 1400;
+    private const int StructuredChunkOverlap = 150;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    public static async Task<IResult> HandleAsync()
+    {
+        var log = new StringBuilder();
+        log.AppendLine("=== Day21: Индексация документов ===");
+        log.AppendLine($"Ollama embedding model: {OllamaEmbeddingModel}");
+
+        var documentsPath = Path.Combine(AppContext.BaseDirectory, SourceName);
+        if (!Directory.Exists(documentsPath))
+        {
+            return Results.NotFound($"Папка с документами не найдена: {documentsPath}");
+        }
+
+        var files = Directory
+            .GetFiles(documentsPath, "*.*", SearchOption.TopDirectoryOnly)
+            .Where(path => path.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)
+                           || path.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
+                           || path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(Path.GetFileName)
+            .ToList();
+
+        if (files.Count == 0)
+        {
+            return Results.BadRequest($"В папке {documentsPath} нет поддерживаемых документов (.txt/.md/.cs).");
+        }
+
+        log.AppendLine($"Документов к индексации: {files.Count}");
+
+        var docTexts = new List<DocText>();
+        foreach (var file in files)
+        {
+            var text = await File.ReadAllTextAsync(file);
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                continue;
+            }
+
+            docTexts.Add(new DocText(
+                FilePath: file,
+                FileName: Path.GetFileName(file),
+                Title: ExtractTitle(text, Path.GetFileNameWithoutExtension(file)),
+                Content: NormalizeText(text)));
+        }
+
+        if (docTexts.Count == 0)
+        {
+            return Results.BadRequest("Не удалось прочитать непустой текст из документов.");
+        }
+
+        var totalCharacters = docTexts.Sum(d => d.Content.Length);
+        var estimatedPages = totalCharacters / 1800.0;
+        log.AppendLine($"Суммарный объём текста: {totalCharacters:N0} символов (~{estimatedPages:F1} страниц)");
+
+        using var httpClient = new HttpClient
+        {
+            BaseAddress = new Uri("http://localhost:11434/")
+        };
+        httpClient.Timeout = TimeSpan.FromMinutes(10);
+
+        var fixedChunks = BuildFixedChunks(docTexts);
+        log.AppendLine($"Fixed-size чанков: {fixedChunks.Count}");
+
+        var structuredChunks = BuildStructuredChunks(docTexts);
+        log.AppendLine($"Structured чанков: {structuredChunks.Count}");
+
+        await EnrichWithEmbeddingsAsync(httpClient, fixedChunks);
+        await EnrichWithEmbeddingsAsync(httpClient, structuredChunks);
+
+        var outputDir = Path.Combine(AppContext.BaseDirectory, "Day21Indexes");
+        Directory.CreateDirectory(outputDir);
+
+        var fixedIndex = BuildIndexResult("fixed_size", fixedChunks, totalCharacters, estimatedPages);
+        var structuredIndex = BuildIndexResult("structured", structuredChunks, totalCharacters, estimatedPages);
+        var comparison = BuildComparison(fixedIndex, structuredIndex);
+
+        fixedIndex.Comparison = comparison;
+        structuredIndex.Comparison = comparison;
+
+        var fixedPath = Path.Combine(outputDir, "day21_index_fixed.json");
+        var structuredPath = Path.Combine(outputDir, "day21_index_structured.json");
+        var comparisonPath = Path.Combine(outputDir, "day21_chunking_comparison.json");
+
+        await File.WriteAllTextAsync(fixedPath, JsonSerializer.Serialize(fixedIndex, JsonOptions));
+        await File.WriteAllTextAsync(structuredPath, JsonSerializer.Serialize(structuredIndex, JsonOptions));
+        await File.WriteAllTextAsync(comparisonPath, JsonSerializer.Serialize(comparison, JsonOptions));
+
+        log.AppendLine();
+        log.AppendLine("✅ Индексация завершена.");
+        log.AppendLine($"Fixed index: {fixedPath}");
+        log.AppendLine($"Structured index: {structuredPath}");
+        log.AppendLine($"Comparison: {comparisonPath}");
+
+        return Results.Content(log.ToString());
+    }
+
+    private static List<ChunkRecord> BuildFixedChunks(IEnumerable<DocText> docs)
+    {
+        var chunks = new List<ChunkRecord>();
+
+        foreach (var doc in docs)
+        {
+            var offset = 0;
+            var index = 0;
+            while (offset < doc.Content.Length)
+            {
+                var size = Math.Min(FixedChunkSize, doc.Content.Length - offset);
+                var text = doc.Content.Substring(offset, size).Trim();
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    chunks.Add(new ChunkRecord
+                    {
+                        ChunkId = $"{Path.GetFileNameWithoutExtension(doc.FileName)}-fixed-{index:D4}",
+                        Source = SourceName,
+                        File = doc.FileName,
+                        Title = doc.Title,
+                        Section = "fixed_window",
+                        Strategy = "fixed_size",
+                        Text = text
+                    });
+                    index++;
+                }
+
+                if (offset + size >= doc.Content.Length)
+                {
+                    break;
+                }
+
+                offset += Math.Max(1, size - FixedChunkOverlap);
+            }
+        }
+
+        return chunks;
+    }
+
+    private static List<ChunkRecord> BuildStructuredChunks(IEnumerable<DocText> docs)
+    {
+        var chunks = new List<ChunkRecord>();
+
+        foreach (var doc in docs)
+        {
+            var sections = SplitSections(doc.Content);
+            var index = 0;
+
+            foreach (var section in sections)
+            {
+                var windows = SplitByWindow(section.Content, StructuredChunkSize, StructuredChunkOverlap);
+                foreach (var window in windows)
+                {
+                    if (string.IsNullOrWhiteSpace(window))
+                    {
+                        continue;
+                    }
+
+                    chunks.Add(new ChunkRecord
+                    {
+                        ChunkId = $"{Path.GetFileNameWithoutExtension(doc.FileName)}-struct-{index:D4}",
+                        Source = SourceName,
+                        File = doc.FileName,
+                        Title = doc.Title,
+                        Section = section.Title,
+                        Strategy = "structured",
+                        Text = window.Trim()
+                    });
+                    index++;
+                }
+            }
+        }
+
+        return chunks;
+    }
+
+    private static async Task EnrichWithEmbeddingsAsync(HttpClient httpClient, List<ChunkRecord> chunks)
+    {
+        for (var i = 0; i < chunks.Count; i++)
+        {
+            chunks[i].Embedding = await GetEmbeddingAsync(httpClient, chunks[i].Text);
+        }
+    }
+
+    private static async Task<List<float>> GetEmbeddingAsync(HttpClient httpClient, string text)
+    {
+        var embedRequest = JsonSerializer.Serialize(new
+        {
+            model = OllamaEmbeddingModel,
+            input = text
+        });
+
+        using var embedContent = new StringContent(embedRequest, Encoding.UTF8, "application/json");
+        using var embedResponse = await httpClient.PostAsync("api/embed", embedContent);
+
+        if (embedResponse.IsSuccessStatusCode)
+        {
+            var embedBody = await embedResponse.Content.ReadAsStringAsync();
+            var apiEmbedResponse = JsonSerializer.Deserialize<OllamaEmbedResponse>(embedBody, JsonOptions);
+            var first = apiEmbedResponse?.Embeddings?.FirstOrDefault();
+            if (first is not null && first.Count > 0)
+            {
+                return first;
+            }
+        }
+
+        var legacyRequest = JsonSerializer.Serialize(new
+        {
+            model = OllamaEmbeddingModel,
+            prompt = text
+        });
+
+        using var legacyContent = new StringContent(legacyRequest, Encoding.UTF8, "application/json");
+        using var legacyResponse = await httpClient.PostAsync("api/embeddings", legacyContent);
+        legacyResponse.EnsureSuccessStatusCode();
+
+        var legacyBody = await legacyResponse.Content.ReadAsStringAsync();
+        var apiLegacyResponse = JsonSerializer.Deserialize<OllamaLegacyEmbeddingResponse>(legacyBody, JsonOptions);
+
+        return apiLegacyResponse?.Embedding ?? throw new InvalidOperationException("Ollama вернул пустой эмбеддинг.");
+    }
+
+    private static List<SectionPart> SplitSections(string content)
+    {
+        var lines = content.Split('\n');
+        var sections = new List<SectionPart>();
+
+        var currentTitle = "preamble";
+        var buffer = new StringBuilder();
+
+        foreach (var rawLine in lines)
+        {
+            var line = rawLine.TrimEnd('\r').Trim();
+            if (IsSectionHeading(line))
+            {
+                AddSectionIfNotEmpty(sections, currentTitle, buffer.ToString());
+                buffer.Clear();
+                currentTitle = line;
+                continue;
+            }
+
+            buffer.AppendLine(rawLine.TrimEnd('\r'));
+        }
+
+        AddSectionIfNotEmpty(sections, currentTitle, buffer.ToString());
+
+        if (sections.Count == 0)
+        {
+            sections.Add(new SectionPart("full_document", content));
+        }
+
+        return sections;
+    }
+
+    private static List<string> SplitByWindow(string text, int chunkSize, int overlap)
+    {
+        var normalized = text.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return [];
+        }
+
+        var result = new List<string>();
+        var offset = 0;
+
+        while (offset < normalized.Length)
+        {
+            var size = Math.Min(chunkSize, normalized.Length - offset);
+            var piece = normalized.Substring(offset, size).Trim();
+            if (!string.IsNullOrWhiteSpace(piece))
+            {
+                result.Add(piece);
+            }
+
+            if (offset + size >= normalized.Length)
+            {
+                break;
+            }
+
+            offset += Math.Max(1, size - overlap);
+        }
+
+        return result;
+    }
+
+    private static void AddSectionIfNotEmpty(List<SectionPart> sections, string title, string text)
+    {
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            sections.Add(new SectionPart(title, text));
+        }
+    }
+
+    private static bool IsSectionHeading(string line)
+    {
+        if (string.IsNullOrWhiteSpace(line) || line.Length > 120)
+        {
+            return false;
+        }
+
+        if (line.Equals("Abstract", StringComparison.OrdinalIgnoreCase)
+            || line.Equals("Status of This Memo", StringComparison.OrdinalIgnoreCase)
+            || line.Equals("Copyright Notice", StringComparison.OrdinalIgnoreCase)
+            || line.Equals("Table of Contents", StringComparison.OrdinalIgnoreCase)
+            || line.Equals("Acknowledgements", StringComparison.OrdinalIgnoreCase)
+            || line.Equals("Author's Address", StringComparison.OrdinalIgnoreCase)
+            || line.Equals("Authors' Addresses", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return SectionNumberRegex().IsMatch(line);
+    }
+
+    private static string NormalizeText(string text)
+    {
+        var normalized = text
+            .Replace("\r\n", "\n")
+            .Replace('\r', '\n')
+            .Replace("\u000c", "\n")
+            .Replace("\t", " ");
+
+        var lines = normalized
+            .Split('\n')
+            .Select(line => Regex.Replace(line, " {2,}", " ").Trim())
+            .ToList();
+
+        // Сжимаем серии пустых строк до одной, чтобы не терять структуру,
+        // но и не раздувать текст лишними переносами.
+        var resultLines = new List<string>(lines.Count);
+        var prevEmpty = false;
+
+        foreach (var line in lines)
+        {
+            var isEmpty = string.IsNullOrWhiteSpace(line);
+            if (isEmpty && prevEmpty)
+            {
+                continue;
+            }
+
+            resultLines.Add(line);
+            prevEmpty = isEmpty;
+        }
+
+        return string.Join('\n', resultLines).Trim();
+    }
+
+    private static string ExtractTitle(string content, string fallback)
+    {
+        var lines = content
+            .Split('\n')
+            .Select(l => l.Trim())
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .Take(80);
+
+        foreach (var line in lines)
+        {
+            if (line.StartsWith("Internet Engineering Task Force", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("Request for Comments", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("Category:", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("ISSN", StringComparison.OrdinalIgnoreCase)
+                || line.StartsWith("RFC", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (line.Length is > 8 and < 120 && Regex.IsMatch(line, "[A-Za-zА-Яа-я]"))
+            {
+                return line;
+            }
+        }
+
+        return fallback;
+    }
+
+    private static IndexResult BuildIndexResult(
+        string strategy,
+        List<ChunkRecord> chunks,
+        int totalCharacters,
+        double estimatedPages)
+    {
+        return new IndexResult
+        {
+            Strategy = strategy,
+            EmbeddingModel = OllamaEmbeddingModel,
+            CreatedAtUtc = DateTime.UtcNow,
+            TotalDocuments = chunks.Select(c => c.File).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
+            TotalChunks = chunks.Count,
+            TotalCharacters = totalCharacters,
+            EstimatedPages = estimatedPages,
+            AverageChunkLength = chunks.Count == 0 ? 0 : chunks.Average(c => c.Text.Length),
+            Chunks = chunks
+        };
+    }
+
+    private static ChunkingComparison BuildComparison(IndexResult fixedIndex, IndexResult structuredIndex)
+    {
+        return new ChunkingComparison
+        {
+            GeneratedAtUtc = DateTime.UtcNow,
+            FixedSize = new ComparisonItem(
+                fixedIndex.TotalChunks,
+                fixedIndex.AverageChunkLength,
+                fixedIndex.Chunks.Select(c => c.Section).Distinct(StringComparer.OrdinalIgnoreCase).Count()),
+            Structured = new ComparisonItem(
+                structuredIndex.TotalChunks,
+                structuredIndex.AverageChunkLength,
+                structuredIndex.Chunks.Select(c => c.Section).Distinct(StringComparer.OrdinalIgnoreCase).Count()),
+            Notes =
+            [
+                "fixed_size: стабилен и предсказуем по длине чанков, но может разрывать смысловые блоки.",
+                "structured: лучше сохраняет семантические границы разделов, но размер чанков менее равномерен."
+            ]
+        };
+    }
+
+    [GeneratedRegex("^\\d+(?:\\.\\d+)*\\.?(?:\\s+.+)$", RegexOptions.Compiled)]
+    private static partial Regex SectionNumberRegex();
+
+    private sealed record DocText(string FilePath, string FileName, string Title, string Content);
+
+    private sealed record SectionPart(string Title, string Content);
+
+    private sealed class ChunkRecord
+    {
+        [JsonPropertyName("chunk_id")]
+        public required string ChunkId { get; init; }
+
+        [JsonPropertyName("source")]
+        public required string Source { get; init; }
+
+        [JsonPropertyName("file")]
+        public required string File { get; init; }
+
+        [JsonPropertyName("title")]
+        public required string Title { get; init; }
+
+        [JsonPropertyName("section")]
+        public required string Section { get; init; }
+
+        [JsonPropertyName("strategy")]
+        public required string Strategy { get; init; }
+
+        [JsonPropertyName("text")]
+        public required string Text { get; init; }
+
+        [JsonPropertyName("embedding")]
+        public List<float>? Embedding { get; set; }
+    }
+
+    private sealed class IndexResult
+    {
+        [JsonPropertyName("strategy")]
+        public required string Strategy { get; init; }
+
+        [JsonPropertyName("embedding_model")]
+        public required string EmbeddingModel { get; init; }
+
+        [JsonPropertyName("created_at_utc")]
+        public DateTime CreatedAtUtc { get; init; }
+
+        [JsonPropertyName("total_documents")]
+        public int TotalDocuments { get; init; }
+
+        [JsonPropertyName("total_chunks")]
+        public int TotalChunks { get; init; }
+
+        [JsonPropertyName("total_characters")]
+        public int TotalCharacters { get; init; }
+
+        [JsonPropertyName("estimated_pages")]
+        public double EstimatedPages { get; init; }
+
+        [JsonPropertyName("avg_chunk_length")]
+        public double AverageChunkLength { get; init; }
+
+        [JsonPropertyName("chunks")]
+        public required List<ChunkRecord> Chunks { get; init; }
+
+        [JsonPropertyName("comparison")]
+        public ChunkingComparison? Comparison { get; set; }
+    }
+
+    private sealed class ChunkingComparison
+    {
+        [JsonPropertyName("generated_at_utc")]
+        public DateTime GeneratedAtUtc { get; init; }
+
+        [JsonPropertyName("fixed_size")]
+        public required ComparisonItem FixedSize { get; init; }
+
+        [JsonPropertyName("structured")]
+        public required ComparisonItem Structured { get; init; }
+
+        [JsonPropertyName("notes")]
+        public required List<string> Notes { get; init; }
+    }
+
+    private sealed record ComparisonItem(
+        [property: JsonPropertyName("chunks")] int Chunks,
+        [property: JsonPropertyName("avg_chunk_length")] double AvgChunkLength,
+        [property: JsonPropertyName("distinct_sections")] int DistinctSections);
+
+    private sealed class OllamaEmbedResponse
+    {
+        [JsonPropertyName("embeddings")]
+        public List<List<float>>? Embeddings { get; init; }
+    }
+
+    private sealed class OllamaLegacyEmbeddingResponse
+    {
+        [JsonPropertyName("embedding")]
+        public List<float>? Embedding { get; init; }
+    }
+}
