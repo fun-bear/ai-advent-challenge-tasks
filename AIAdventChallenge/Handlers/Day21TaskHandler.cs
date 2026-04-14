@@ -63,7 +63,7 @@ public static partial class Day21TaskHandler
             docTexts.Add(new DocText(
                 FilePath: file,
                 FileName: Path.GetFileName(file),
-                Title: ExtractTitle(text, Path.GetFileNameWithoutExtension(file)),
+                Title: Path.GetFileNameWithoutExtension(file),
                 Content: NormalizeText(text)));
         }
 
@@ -313,23 +313,13 @@ public static partial class Day21TaskHandler
 
     private static bool IsSectionHeading(string line)
     {
-        if (string.IsNullOrWhiteSpace(line) || line.Length > 120)
+        if (string.IsNullOrWhiteSpace(line))
         {
             return false;
         }
 
-        if (line.Equals("Abstract", StringComparison.OrdinalIgnoreCase)
-            || line.Equals("Status of This Memo", StringComparison.OrdinalIgnoreCase)
-            || line.Equals("Copyright Notice", StringComparison.OrdinalIgnoreCase)
-            || line.Equals("Table of Contents", StringComparison.OrdinalIgnoreCase)
-            || line.Equals("Acknowledgements", StringComparison.OrdinalIgnoreCase)
-            || line.Equals("Author's Address", StringComparison.OrdinalIgnoreCase)
-            || line.Equals("Authors' Addresses", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return SectionNumberRegex().IsMatch(line);
+        return line.StartsWith("THE ONE ", StringComparison.Ordinal)
+               || line.StartsWith("[Scene:", StringComparison.Ordinal);
     }
 
     private static string NormalizeText(string text)
@@ -363,34 +353,6 @@ public static partial class Day21TaskHandler
         }
 
         return string.Join('\n', resultLines).Trim();
-    }
-
-    private static string ExtractTitle(string content, string fallback)
-    {
-        var lines = content
-            .Split('\n')
-            .Select(l => l.Trim())
-            .Where(l => !string.IsNullOrWhiteSpace(l))
-            .Take(80);
-
-        foreach (var line in lines)
-        {
-            if (line.StartsWith("Internet Engineering Task Force", StringComparison.OrdinalIgnoreCase)
-                || line.StartsWith("Request for Comments", StringComparison.OrdinalIgnoreCase)
-                || line.StartsWith("Category:", StringComparison.OrdinalIgnoreCase)
-                || line.StartsWith("ISSN", StringComparison.OrdinalIgnoreCase)
-                || line.StartsWith("RFC", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (line.Length is > 8 and < 120 && Regex.IsMatch(line, "[A-Za-zА-Яа-я]"))
-            {
-                return line;
-            }
-        }
-
-        return fallback;
     }
 
     private static IndexResult BuildIndexResult(
@@ -433,9 +395,6 @@ public static partial class Day21TaskHandler
             ]
         };
     }
-
-    [GeneratedRegex("^\\d+(?:\\.\\d+)*\\.?(?:\\s+.+)$", RegexOptions.Compiled)]
-    private static partial Regex SectionNumberRegex();
 
     private sealed record DocText(string FilePath, string FileName, string Title, string Content);
 
