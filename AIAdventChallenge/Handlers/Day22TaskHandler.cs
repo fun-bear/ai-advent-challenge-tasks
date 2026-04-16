@@ -53,7 +53,7 @@ public static class Day22TaskHandler
         foreach (var r in results)
         {
             response.AppendLine($"ChunkId: {r.Chunk.ChunkId} | Score: {r.Score:F3} | Файл: {r.Chunk.File} | Секция: {r.Chunk.Section}");
-            response.AppendLine(r.Chunk.Text[..Math.Min(200, r.Chunk.Text.Length)]);
+            response.AppendLine(r.Chunk.Text[..Math.Min(1000, r.Chunk.Text.Length)]);
             response.AppendLine("---");
         }
 
