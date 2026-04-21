@@ -3,17 +3,22 @@ using AIAdventChallenge.Infrastructure;
 namespace AIAdventChallenge.Handlers;
 
 /// <summary>
-/// День 01.
+/// День 27.
 /// Специальный handler для музыкального ассистента сервиса по подбору музыки.
 /// Составляет плейлист из 10 музыкальных композиций, основываясь на текущих дате и времени.
+/// В отличие от Day01 использует локальный Ollama через OpenAI-совместимый API.
 /// </summary>
-public static class Day01TaskHandler
+public static class Day27TaskHandler
 {
+    private const string OLLAMA_API_KEY = "ollama";
+    private const string OLLAMA_MODEL_NAME = "llama3.1:8b";
+    private const string OLLAMA_BASE_URL = "http://localhost:11434/v1/";
+
     private const string SYSTEM_PROMPT =
     """
     Ты — музыкальный ассистент сервиса по подбору музыки.
 
-    Твоя задача: составлять плейлист из ровно 10 музыкальных композиций, основываясь на дате и времени, которые передаёт пользователь.
+    Твоя задача: составлять плейлист из ровно 3 музыкальные композиции, основываясь на дате и времени, которые передаёт пользователь.
 
     При подборе учитывай:
     - Время суток (утро / день / вечер / ночь) — темп, энергетика и настроение треков
@@ -21,7 +26,7 @@ public static class Day01TaskHandler
     - Сочетаемость треков между собой внутри плейлиста
 
     Правила составления плейлиста:
-    - Ровно 10 треков, не больше и не меньше
+    - Ровно 3 трека, не больше и не меньше
     - Указывай: номер, исполнитель — название трека
     - После плейлиста — одно короткое предложение (1–2 строки), объясняющее настроение подборки
     - После фразы про настроение добавляй отдельную строку с представлением модели в формате: Модель: [название модели]
@@ -31,22 +36,16 @@ public static class Day01TaskHandler
     Формат ответа:
     1. Исполнитель — Название трека
     2. Исполнитель — Название трека
-    ...
-    10. Исполнитель — Название трека
+    3. Исполнитель — Название трека
 
     [Одна фраза про настроение плейлиста]
-    Модель: [название модели]
+    Модель: [название LLM модели]
     """;
 
-    public static async Task<string> HandleAsync(IConfiguration configuration)
+    public static async Task<string> HandleAsync()
     {
-        var settings = configuration.GetSection("OpenAISettings");
-        var apiKey = settings["ApiKey"] ?? throw new InvalidOperationException("OpenAISettings:ApiKey is missing.");
-        var modelName = settings["ModelName"] ?? throw new InvalidOperationException("OpenAISettings:ModelName is missing.");
-        var baseUrl = settings["BaseUrl"] ?? throw new InvalidOperationException("OpenAISettings:BaseUrl is missing.");
-
-        var modelSettings = new AIModelSettings(modelName);
-        using var llmClient = new LLMClient(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
+        var modelSettings = new AIModelSettings(OLLAMA_MODEL_NAME);
+        using var llmClient = new LLMClient(OLLAMA_BASE_URL, OLLAMA_API_KEY, modelSettings, SYSTEM_PROMPT);
         var now = DateTimeOffset.Now;
         var userMessage = $"Текущая дата и время: {now:yyyy-MM-dd HH:mm}. Составь плейлист на основе этих данных.";
 
