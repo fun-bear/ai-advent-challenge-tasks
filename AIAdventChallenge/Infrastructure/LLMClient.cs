@@ -19,12 +19,22 @@ public class LLMClient : IDisposable
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public LLMClient(string baseAddress, string apiKey, AIModelSettings modelSettings, string? systemPrompt = null)
+    public LLMClient(
+        string baseAddress,
+        string apiKey,
+        AIModelSettings modelSettings,
+        string? systemPrompt = null,
+        TimeSpan? timeout = null)
     {
         _modelSettings = modelSettings;
         _systemPrompt = systemPrompt;
 
         _http = new HttpClient { BaseAddress = new Uri(baseAddress) };
+        if (timeout.HasValue)
+        {
+            _http.Timeout = timeout.Value;
+        }
+
         _http.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", apiKey);
 
