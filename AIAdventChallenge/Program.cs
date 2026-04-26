@@ -3,8 +3,10 @@ using AIAdventChallenge.Handlers.Day03TaskHandlers;
 using AIAdventChallenge.Handlers.Day10TaskHandlers;
 using AIAdventChallenge.Handlers.Day18TaskHandlers;
 using AIAdventChallenge.Infrastructure.Storage;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,7 +15,30 @@ sqliteConnectionBuilder.DataSource = Path.Combine(AppContext.BaseDirectory, "ai-
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite(sqliteConnectionBuilder.ToString()));
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("day30-task-rate-limit", httpContext =>
+    {
+        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown-client";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: clientIp,
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
+});
+
 var app = builder.Build();
+
+app.UseRateLimiter();
 
 using (var scope = app.Services.CreateScope())
 {
@@ -54,6 +79,7 @@ app.MapGet("/day25/task", Day25TaskHandler.HandleAsync);
 app.MapGet("/day27/task", Day27TaskHandler.HandleAsync);
 app.MapGet("/day28/task", Day28TaskHandler.HandleAsync);
 app.MapGet("/day29/task", Day29TaskHandler.HandleAsync);
-app.MapGet("/day30/task", Day30TaskHandler.HandleAsync);
+app.MapGet("/day30/task", Day30TaskHandler.HandleAsync)
+    .RequireRateLimiting("day30-task-rate-limit");
 
 app.Run();
