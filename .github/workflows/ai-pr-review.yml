@@ -49,8 +49,18 @@ jobs:
           query=$(printf "%s\n\n%s" "$PR_TITLE" "$PR_BODY")
           echo "Query length: ${#query} символов"
 
-          # Создаём JSON
-          jq -n --arg query "$query" '{ query: $query }' > rag_request.json
+          # Создаём JSON-RPC запрос к MCP tool `search`
+          jq -n --arg query "$query" '{
+            jsonrpc: "2.0",
+            id: 1,
+            method: "tools/call",
+            params: {
+              name: "search",
+              arguments: {
+                query: $query
+              }
+            }
+          }' > rag_request.json
 
           # Проверяем JSON
           if ! jq -e . rag_request.json > /dev/null 2>&1; then
@@ -65,8 +75,9 @@ jobs:
 
           echo "📤 Отправляем запрос к RAG endpoint..."
           curl -v --max-time 30 --connect-timeout 10 -X POST \
-            "https://blog-haste-halt.ngrok-free.dev/search" \
+            "https://blog-haste-halt.ngrok-free.dev/mcp" \
             -H "Content-Type: application/json" \
+            -H "ngrok-skip-browser-warning: true" \
             --data-binary @rag_request.json > rag_response.json 2> curl_errors.txt || {
             HTTP_EXIT_CODE=$?
             echo "❌ curl завершился с кодом: $HTTP_EXIT_CODE"
@@ -81,19 +92,29 @@ jobs:
 
           echo "📥 Ответ получен, размер: $(wc -c < rag_response.json) байт"
 
-          # Проверяем JSON ответа
+          # Проверяем JSON ответа MCP
           if jq -e . rag_response.json > /dev/null 2>&1; then
+            # MCP tools/call обычно возвращает result.content[] с text-полями.
             rag_context=$(jq -r '
-              if type == "array" then
-                if length == 0 then "RAG: релевантные чанки не найдены."
-                else map("[score=\(.score // \"n/a\")] \(.file // \"unknown\") :: \(.title // \"untitled\")\\n\(.text // \"\")") | join("\\n\\n---\\n\\n") end
-              elif type == "object" and (.items? | type == "array") then
-                if (.items | length) == 0 then "RAG: релевантные чанки не найдены."
-                else .items | map("[score=\(.score // \"n/a\")] \(.file // \"unknown\") :: \(.title // \"untitled\")\\n\(.text // \"\")") | join("\\n\\n---\\n\\n") end
+              if .error? then
+                "RAG: MCP вернул ошибку: " + (.error.message // "unknown error")
+              elif (.result.content? | type == "array") then
+                (.result.content
+                  | map(
+                      if .type == "text" then .text
+                      else (.|tostring)
+                      end
+                    )
+                  | join("\n\n---\n\n")
+                )
               else
-                "RAG: не удалось распарсить структуру search-ответа."
+                "RAG: не удалось распарсить MCP-ответ tools/call."
               end
             ' rag_response.json)
+
+            if [ -z "$rag_context" ] || [ "$rag_context" = "null" ]; then
+              rag_context="RAG: релевантные чанки не найдены."
+            fi
           else
             echo "❌ Ответ невалиден, содержимое:"
             cat rag_response.json
