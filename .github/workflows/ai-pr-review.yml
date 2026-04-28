@@ -41,24 +41,67 @@ jobs:
           echo "$diff" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
+      - name: Fetch RAG context
+        id: rag
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          query=$(printf "%s\n\n%s" "$PR_TITLE" "$PR_BODY")
+
+          jq -n --arg query "$query" '{ query: $query }' > rag_request.json
+
+          curl -sS -X POST "https://blog-haste-halt.ngrok-free.dev/search" \
+            -H "Content-Type: application/json" \
+            --data-binary @rag_request.json > rag_response.json
+
+          rag_context=$(jq -r '
+            if type == "array" then
+              if length == 0 then "RAG: релевантные чанки не найдены."
+              else map("[score=\(.score // \"n/a\")] \(.file // \"unknown\") :: \(.title // \"untitled\")\\n\(.text // \"\")") | join("\\n\\n---\\n\\n") end
+            elif type == "object" and (.items? | type == "array") then
+              if (.items | length) == 0 then "RAG: релевантные чанки не найдены."
+              else .items | map("[score=\(.score // \"n/a\")] \(.file // \"unknown\") :: \(.title // \"untitled\")\\n\(.text // \"\")") | join("\\n\\n---\\n\\n") end
+            else
+              "RAG: не удалось распарсить ответ search, передаём raw JSON.\\n" + (tojson)
+            end
+          ' rag_response.json)
+
+          {
+            echo "rag_context<<EOF"
+            echo "$rag_context"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
       - name: AI Code Review
         env:
           ROUTERAI_API_KEY: ${{ secrets.ROUTERAI_API_KEY }}
           PR_DIFF: ${{ steps.diff.outputs.diff }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          RAG_CONTEXT: ${{ steps.rag.outputs.rag_context }}
         run: |
           # Формируем JSON безопасно (с корректным экранированием многострочного diff)
           jq -n \
             --arg diff "$PR_DIFF" \
+            --arg prTitle "$PR_TITLE" \
+            --arg prBody "$PR_BODY" \
+            --arg rag "$RAG_CONTEXT" \
             '{
               model: "openai/gpt-5.4",
               messages: [
                 {
                   role: "system",
-                  content: "Ты опытный код‑ревьюер. Анализируй diff, находи баги, архитектурные проблемы, давай рекомендации. Если diff пустой или неполный — явно сообщи об этом."
+                  content: "Ты опытный код‑ревьюер. Анализируй diff, находи баги, архитектурные проблемы, давай рекомендации. Используй RAG-контекст как дополнительную справочную информацию по проекту. Если diff пустой или неполный — явно сообщи об этом."
                 },
                 {
                   role: "user",
-                  content: ("Проанализируй этот PR diff:\n" + $diff)
+                  content: (
+                    "PR title:\n" + $prTitle +
+                    "\n\nPR description:\n" + ($prBody // "") +
+                    "\n\nRAG context:\n" + $rag +
+                    "\n\nПроанализируй этот PR diff:\n" + $diff
+                  )
                 }
               ]
             }' > review_payload.json
