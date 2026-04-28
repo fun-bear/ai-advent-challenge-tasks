@@ -21,7 +21,8 @@ builder.Services.AddMcpServer()
     .WithTools<HelloTool>()
     .WithTools<PingTool>()
     .WithTools<MoonTelegramTool>()
-    .WithTools<NominatimOpenStreetMapTool>();
+    .WithTools<NominatimOpenStreetMapTool>()
+    .WithTools<RagTool>();
 
 var app = builder.Build();
 

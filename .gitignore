@@ -56,3 +56,4 @@ nunit-*.xml
 # User secrets / local launch settings
 AIAdventChallenge/Properties/launchSettings.json
 AIAdventChallenge.MCPServer.Http/Day31Indexes/day31_index_structured.json
+AIAdventChallenge.MCPServer.Http/Day31Indexes/day31_index_structured_old.json
