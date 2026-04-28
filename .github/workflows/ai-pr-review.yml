@@ -60,7 +60,8 @@ jobs:
             }' > review_response.json
 
           # Извлекаем текст ревью из ответа
-          jq -r '.choices[0].message.content' review_response.json > review.txt
+          # jq -r '.choices[0].message.content' review_response.json > review.txt
+          cat review_response.json > review.txt
 
       - name: Post Review Comment
         uses: actions/github-script@v7
