@@ -53,3 +53,5 @@ ollama --version
 ollama pull llama3.1:8b
 ollama run llama3.1:8b
 ```
+
+Примечание: если модель не запускается с первого раза, перезапусти терминал и повтори команду `ollama run llama3.1:8b`.
