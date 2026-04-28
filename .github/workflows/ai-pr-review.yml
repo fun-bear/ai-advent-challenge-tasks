@@ -35,36 +35,66 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Формируем query
           query=$(printf "%s\n\n%s" "$PR_TITLE" "$PR_BODY")
+          echo "Query length: ${#query} символов"
 
+          # Создаём JSON
           jq -n --arg query "$query" '{ query: $query }' > rag_request.json
 
-          if curl -sS --fail-with-body -X POST "https://blog-haste-halt.ngrok-free.dev/search" \
-            -H "Content-Type: application/json" \
-            --data-binary @rag_request.json > rag_response.json; then
-            if jq -e . rag_response.json > /dev/null 2>&1; then
-              rag_context=$(jq -r '
-                if type == "array" then
-                  if length == 0 then "RAG: релевантные чанки не найдены."
-                  else map("[score=\(.score // \"n/a\")] \(.file // \"unknown\") :: \(.title // \"untitled\")\\n\(.text // \"\")") | join("\\n\\n---\\n\\n") end
-                elif type == "object" and (.items? | type == "array") then
-                  if (.items | length) == 0 then "RAG: релевантные чанки не найдены."
-                  else .items | map("[score=\(.score // \"n/a\")] \(.file // \"unknown\") :: \(.title // \"untitled\")\\n\(.text // \"\")") | join("\\n\\n---\\n\\n") end
-                else
-                  "RAG: не удалось распарсить структуру search-ответа."
-                end
-              ' rag_response.json)
-            else
-              rag_context="RAG: endpoint вернул невалидный JSON, контекст недоступен."
-            fi
-          else
-            rag_context="RAG: не удалось получить контекст (ошибка HTTP при вызове search endpoint)."
+          # Проверяем JSON
+          if ! jq -e . rag_request.json > /dev/null 2>&1; then
+            echo "❌ rag_request.json невалиден"
+            cat rag_request.json
+            rag_context="RAG: ошибка формирования запроса (невалидный JSON)"
+            echo "rag_context<<EOF" >> $GITHUB_OUTPUT
+            echo "$rag_context" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 0  # Не прерываем workflow, но помечаем ошибку
           fi
 
+          echo "📤 Отправляем запрос к RAG endpoint..."
+          curl -v --max-time 30 --connect-timeout 10 -X POST \
+            "https://blog-haste-halt.ngrok-free.dev/search" \
+            -H "Content-Type: application/json" \
+            --data-binary @rag_request.json > rag_response.json 2> curl_errors.txt || {
+            HTTP_EXIT_CODE=$?
+            echo "❌ curl завершился с кодом: $HTTP_EXIT_CODE"
+            echo "Ошибки curl:"
+            cat curl_errors.txt
+            rag_context="RAG: не удалось получить контекст (curl exit code: $HTTP_EXIT_CODE)"
+            echo "rag_context<<EOF" >> $GITHUB_OUTPUT
+            echo "$rag_context" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 0
+          }
+
+          echo "📥 Ответ получен, размер: $(wc -c < rag_response.json) байт"
+
+          # Проверяем JSON ответа
+          if jq -e . rag_response.json > /dev/null 2>&1; then
+            rag_context=$(jq -r '
+              if type == "array" then
+                if length == 0 then "RAG: релевантные чанки не найдены."
+                else map("[score=\(.score // \"n/a\")] \(.file // \"unknown\") :: \(.title // \"untitled\")\\n\(.text // \"\")") | join("\\n\\n---\\n\\n") end
+              elif type == "object" and (.items? | type == "array") then
+                if (.items | length) == 0 then "RAG: релевантные чанки не найдены."
+                else .items | map("[score=\(.score // \"n/a\")] \(.file // \"unknown\") :: \(.title // \"untitled\")\\n\(.text // \"\")") | join("\\n\\n---\\n\\n") end
+              else
+                "RAG: не удалось распарсить структуру search-ответа."
+              end
+            ' rag_response.json)
+          else
+            echo "❌ Ответ невалиден, содержимое:"
+            cat rag_response.json
+            rag_context="RAG: endpoint вернул невалидный JSON, контекст недоступен."
+          fi
+
+          # Исправление: используем уникальный разделитель вместо EOF
           {
-            echo "rag_context<<EOF"
+            echo "rag_context<<RAG_EOF"
             echo "$rag_context"
-            echo "EOF"
+            echo "RAG_EOF"
           } >> $GITHUB_OUTPUT
 
       - name: Setup .NET
