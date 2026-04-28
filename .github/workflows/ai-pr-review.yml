@@ -45,6 +45,8 @@ jobs:
         run: |
           set -euo pipefail
 
+          MCP_URL="https://blog-haste-halt.ngrok-free.dev/"
+
           # Формируем query
           query=$(printf "%s\n\n%s" "$PR_TITLE" "$PR_BODY")
           echo "Query length: ${#query} символов"
@@ -62,6 +64,21 @@ jobs:
             }
           }' > rag_request.json
 
+          # Создаём initialize-запрос (MCP handshake)
+          jq -n '{
+            jsonrpc: "2.0",
+            id: "init-1",
+            method: "initialize",
+            params: {
+              protocolVersion: "2024-11-05",
+              capabilities: {},
+              clientInfo: {
+                name: "github-actions-ai-pr-review",
+                version: "1.0.0"
+              }
+            }
+          }' > mcp_init_request.json
+
           # Проверяем JSON
           if ! jq -e . rag_request.json > /dev/null 2>&1; then
             echo "❌ rag_request.json невалиден"
@@ -73,12 +90,44 @@ jobs:
             exit 0  # Не прерываем workflow, но помечаем ошибку
           fi
 
-          echo "📤 Отправляем запрос к RAG endpoint..."
-          curl -v --max-time 30 --connect-timeout 10 -X POST \
-            "https://blog-haste-halt.ngrok-free.dev/mcp" \
+          echo "📤 Инициализируем MCP-сессию..."
+          curl -sS --max-time 30 --connect-timeout 10 -X POST \
+            "$MCP_URL" \
             -H "Content-Type: application/json" \
             -H "ngrok-skip-browser-warning: true" \
-            --data-binary @rag_request.json > rag_response.json 2> curl_errors.txt || {
+            --data-binary @mcp_init_request.json \
+            -D mcp_init_headers.txt > mcp_init_response.sse 2> curl_errors.txt || {
+            HTTP_EXIT_CODE=$?
+            echo "❌ initialize curl завершился с кодом: $HTTP_EXIT_CODE"
+            echo "Ошибки curl:"
+            cat curl_errors.txt
+            rag_context="RAG: не удалось инициализировать MCP-сессию (curl exit code: $HTTP_EXIT_CODE)"
+            echo "rag_context<<EOF" >> $GITHUB_OUTPUT
+            echo "$rag_context" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 0
+          }
+
+          MCP_SESSION_ID=$(awk 'BEGIN{IGNORECASE=1} /^Mcp-Session-Id:/ {gsub("\r", "", $2); print $2}' mcp_init_headers.txt | tail -n1)
+          if [ -z "$MCP_SESSION_ID" ]; then
+            echo "❌ Не удалось получить Mcp-Session-Id из initialize-ответа"
+            echo "Headers:"
+            cat mcp_init_headers.txt
+            rag_context="RAG: initialize выполнен, но сервер не вернул Mcp-Session-Id"
+            echo "rag_context<<EOF" >> $GITHUB_OUTPUT
+            echo "$rag_context" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "✅ MCP инициализирован, Session ID получен"
+          echo "📤 Отправляем tools/call(search) к MCP endpoint..."
+          curl -sS --max-time 30 --connect-timeout 10 -X POST \
+            "$MCP_URL" \
+            -H "Content-Type: application/json" \
+            -H "Mcp-Session-Id: $MCP_SESSION_ID" \
+            -H "ngrok-skip-browser-warning: true" \
+            --data-binary @rag_request.json > rag_response.sse 2> curl_errors.txt || {
             HTTP_EXIT_CODE=$?
             echo "❌ curl завершился с кодом: $HTTP_EXIT_CODE"
             echo "Ошибки curl:"
@@ -90,7 +139,20 @@ jobs:
             exit 0
           }
 
-          echo "📥 Ответ получен, размер: $(wc -c < rag_response.json) байт"
+          echo "📥 SSE-ответ получен, размер: $(wc -c < rag_response.sse) байт"
+
+          # MCP over HTTP может вернуть SSE (data: {...}). Извлекаем JSON payload.
+          sed -n 's/^data: //p' rag_response.sse | tail -n 1 > rag_response.json
+
+          if [ ! -s rag_response.json ]; then
+            echo "❌ Не удалось извлечь JSON из SSE-ответа"
+            cat rag_response.sse
+            rag_context="RAG: MCP вернул неожиданный формат ответа (SSE без data JSON)."
+            echo "rag_context<<EOF" >> $GITHUB_OUTPUT
+            echo "$rag_context" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 0
+          fi
 
           # Проверяем JSON ответа MCP
           if jq -e . rag_response.json > /dev/null 2>&1; then
