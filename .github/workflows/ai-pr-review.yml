@@ -39,7 +39,7 @@ jobs:
 
       - name: AI Code Review
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ROUTERAI_API_KEY: ${{ secrets.ROUTERAI_API_KEY }}
         run: |
           # Пример вызова OpenAI API (замените на свой RAG‑сервис)
           curl -X POST "https://routerai.ru/api/v1/chat/completions" \
