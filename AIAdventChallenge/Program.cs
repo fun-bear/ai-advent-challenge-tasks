@@ -38,6 +38,7 @@ builder.Services.AddRateLimiter(options =>
 
 var app = builder.Build();
 
+// Temporary comment for dev5 branch change
 app.UseRateLimiter();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));

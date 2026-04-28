@@ -16,6 +16,87 @@ jobs:
           fetch-depth: 0 # Для получения diff
           ref: ${{ github.event.pull_request.head.sha }}
 
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }} --depth=1
+
+      - name: Get PR diff
+        id: diff
+        run: |
+          diff=$(git diff origin/${{ github.base_ref }}...HEAD)
+          echo "diff<<EOF" >> $GITHUB_OUTPUT
+          echo "$diff" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Fetch RAG context
+        id: rag
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          # Формируем query
+          query=$(printf "%s\n\n%s" "$PR_TITLE" "$PR_BODY")
+          echo "Query length: ${#query} символов"
+
+          # Создаём JSON
+          jq -n --arg query "$query" '{ query: $query }' > rag_request.json
+
+          # Проверяем JSON
+          if ! jq -e . rag_request.json > /dev/null 2>&1; then
+            echo "❌ rag_request.json невалиден"
+            cat rag_request.json
+            rag_context="RAG: ошибка формирования запроса (невалидный JSON)"
+            echo "rag_context<<EOF" >> $GITHUB_OUTPUT
+            echo "$rag_context" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 0  # Не прерываем workflow, но помечаем ошибку
+          fi
+
+          echo "📤 Отправляем запрос к RAG endpoint..."
+          curl -v --max-time 30 --connect-timeout 10 -X POST \
+            "https://blog-haste-halt.ngrok-free.dev/search" \
+            -H "Content-Type: application/json" \
+            --data-binary @rag_request.json > rag_response.json 2> curl_errors.txt || {
+            HTTP_EXIT_CODE=$?
+            echo "❌ curl завершился с кодом: $HTTP_EXIT_CODE"
+            echo "Ошибки curl:"
+            cat curl_errors.txt
+            rag_context="RAG: не удалось получить контекст (curl exit code: $HTTP_EXIT_CODE)"
+            echo "rag_context<<EOF" >> $GITHUB_OUTPUT
+            echo "$rag_context" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            exit 0
+          }
+
+          echo "📥 Ответ получен, размер: $(wc -c < rag_response.json) байт"
+
+          # Проверяем JSON ответа
+          if jq -e . rag_response.json > /dev/null 2>&1; then
+            rag_context=$(jq -r '
+              if type == "array" then
+                if length == 0 then "RAG: релевантные чанки не найдены."
+                else map("[score=\(.score // \"n/a\")] \(.file // \"unknown\") :: \(.title // \"untitled\")\\n\(.text // \"\")") | join("\\n\\n---\\n\\n") end
+              elif type == "object" and (.items? | type == "array") then
+                if (.items | length) == 0 then "RAG: релевантные чанки не найдены."
+                else .items | map("[score=\(.score // \"n/a\")] \(.file // \"unknown\") :: \(.title // \"untitled\")\\n\(.text // \"\")") | join("\\n\\n---\\n\\n") end
+              else
+                "RAG: не удалось распарсить структуру search-ответа."
+              end
+            ' rag_response.json)
+          else
+            echo "❌ Ответ невалиден, содержимое:"
+            cat rag_response.json
+            rag_context="RAG: endpoint вернул невалидный JSON, контекст недоступен."
+          fi
+
+          # Исправление: используем уникальный разделитель вместо EOF
+          {
+            echo "rag_context<<RAG_EOF"
+            echo "$rag_context"
+            echo "RAG_EOF"
+          } >> $GITHUB_OUTPUT
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -30,35 +111,35 @@ jobs:
       #- name: Test
       #  run: dotnet test --no-build --verbosity normal
 
-      - name: Fetch base branch
-        run: git fetch origin ${{ github.base_ref }} --depth=1
-
-      - name: Get PR diff
-        id: diff
-        run: |
-          diff=$(git diff origin/${{ github.base_ref }}...HEAD)
-          echo "diff<<EOF" >> $GITHUB_OUTPUT
-          echo "$diff" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: AI Code Review
         env:
           ROUTERAI_API_KEY: ${{ secrets.ROUTERAI_API_KEY }}
           PR_DIFF: ${{ steps.diff.outputs.diff }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          RAG_CONTEXT: ${{ steps.rag.outputs.rag_context }}
         run: |
           # Формируем JSON безопасно (с корректным экранированием многострочного diff)
           jq -n \
             --arg diff "$PR_DIFF" \
+            --arg prTitle "$PR_TITLE" \
+            --arg prBody "$PR_BODY" \
+            --arg rag "$RAG_CONTEXT" \
             '{
               model: "openai/gpt-5.4",
               messages: [
                 {
                   role: "system",
-                  content: "Ты опытный код‑ревьюер. Анализируй diff, находи баги, архитектурные проблемы, давай рекомендации. Если diff пустой или неполный — явно сообщи об этом."
+                  content: "Ты опытный код‑ревьюер. Анализируй diff, находи баги, архитектурные проблемы, давай рекомендации. Используй RAG-контекст как дополнительную справочную информацию по проекту. Если diff пустой или неполный — явно сообщи об этом."
                 },
                 {
                   role: "user",
-                  content: ("Проанализируй этот PR diff:\n" + $diff)
+                  content: (
+                    "PR title:\n" + $prTitle +
+                    "\n\nPR description:\n" + ($prBody // "") +
+                    "\n\nRAG context:\n" + $rag +
+                    "\n\nПроанализируй этот PR diff:\n" + $diff
+                  )
                 }
               ]
             }' > review_payload.json
@@ -68,10 +149,14 @@ jobs:
             -H "Content-Type: application/json" \
             --data-binary @review_payload.json > review_response.json
 
-          # review.txt должен содержать всё, что отправили в LLM, + её ответ
+          # В комментарий отправляем только краткую сводку входных данных и ответ модели.
+          # Полный payload не публикуем, чтобы не засорять PR и не путать с «кодом run».
           {
-            echo "=== REQUEST SENT TO LLM ==="
-            cat review_payload.json
+            echo "=== REQUEST SUMMARY ==="
+            echo "PR title: $PR_TITLE"
+            echo "PR description length: ${#PR_BODY}"
+            echo "PR diff length: ${#PR_DIFF}"
+            echo "RAG context length: ${#RAG_CONTEXT}"
             echo
             echo "=== LLM RESPONSE ==="
             jq -r '.choices[0].message.content // .choices[0].message.reasoning // "Пустой ответ от модели"' review_response.json
