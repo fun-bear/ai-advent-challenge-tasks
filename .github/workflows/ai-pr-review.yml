@@ -17,12 +17,22 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Fetch base branch
-        run: git fetch origin ${{ github.base_ref }} --depth=1
+        run: git fetch origin ${{ github.base_ref }}
 
       - name: Get PR diff
         id: diff
         run: |
-          diff=$(git diff origin/${{ github.base_ref }}...HEAD)
+          set -euo pipefail
+
+          # Предпочитаем diff по merge-base (triple-dot), но если merge-base
+          # недоступен (например, из-за неполной истории), используем fallback.
+          if diff=$(git diff origin/${{ github.base_ref }}...HEAD); then
+            echo "Using triple-dot diff (merge-base based)."
+          else
+            echo "Triple-dot diff failed, fallback to two-dot diff."
+            diff=$(git diff origin/${{ github.base_ref }}..HEAD)
+          fi
+
           echo "diff<<EOF" >> $GITHUB_OUTPUT
           echo "$diff" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
