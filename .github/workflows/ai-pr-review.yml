@@ -68,8 +68,14 @@ jobs:
             -H "Content-Type: application/json" \
             --data-binary @review_payload.json > review_response.json
 
-          # Извлекаем итоговый текст ревью
-          jq -r '.choices[0].message.content // .choices[0].message.reasoning // "Пустой ответ от модели"' review_response.json > review.txt
+          # review.txt должен содержать всё, что отправили в LLM, + её ответ
+          {
+            echo "=== REQUEST SENT TO LLM ==="
+            cat review_payload.json
+            echo
+            echo "=== LLM RESPONSE ==="
+            jq -r '.choices[0].message.content // .choices[0].message.reasoning // "Пустой ответ от модели"' review_response.json
+          } > review.txt
 
       - name: Post Review Comment
         uses: actions/github-script@v7
