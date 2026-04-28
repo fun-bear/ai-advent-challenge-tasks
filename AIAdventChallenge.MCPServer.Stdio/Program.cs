@@ -12,6 +12,7 @@ builder.Logging.ClearProviders();
 builder.Services
     .AddMcpServer()
     .WithStdioServerTransport()
-    .WithTools<MoonLanguareTool>();
+    .WithTools<MoonLanguareTool>()
+    .WithTools<GitTool>();
 
 await builder.Build().RunAsync();
