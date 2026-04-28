@@ -11,12 +11,12 @@ namespace AIAdventChallenge.Handlers;
 /// </summary>
 public static partial class Day21TaskHandler
 {
-    private const string SourceName = "Documents";
+    private const string SourceName = "C:\\github\\ai-advent-challenge-tasks\\ABP.Docs";
     private const string OllamaEmbeddingModel = "nomic-embed-text";
     private const int FixedChunkSize = 1200;
     private const int FixedChunkOverlap = 200;
-    private const int StructuredChunkSize = 1400;
-    private const int StructuredChunkOverlap = 150;
+    private const int StructuredChunkSize = 4000;
+    private const int StructuredChunkOverlap = 500;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -27,8 +27,15 @@ public static partial class Day21TaskHandler
     public static async Task<IResult> HandleAsync()
     {
         var log = new StringBuilder();
+
+        static void ReportProgress(string message)
+        {
+            Console.WriteLine($"[Day21] {message}");
+        }
+
         log.AppendLine("=== Day21: Индексация документов ===");
         log.AppendLine($"Ollama embedding model: {OllamaEmbeddingModel}");
+        ReportProgress("Старт индексации документов.");
 
         var documentsPath = Path.Combine(AppContext.BaseDirectory, SourceName);
         if (!Directory.Exists(documentsPath))
@@ -37,7 +44,7 @@ public static partial class Day21TaskHandler
         }
 
         var files = Directory
-            .GetFiles(documentsPath, "*.*", SearchOption.TopDirectoryOnly)
+            .GetFiles(documentsPath, "*.*", SearchOption.AllDirectories)
             .Where(path => path.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)
                            || path.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
                            || path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
@@ -50,13 +57,17 @@ public static partial class Day21TaskHandler
         }
 
         log.AppendLine($"Документов к индексации: {files.Count}");
+        ReportProgress($"Найдено документов: {files.Count}.");
 
         var docTexts = new List<DocText>();
-        foreach (var file in files)
+        for (var fileIndex = 0; fileIndex < files.Count; fileIndex++)
         {
+            var file = files[fileIndex];
+            ReportProgress($"Чтение и нормализация файла {fileIndex + 1}/{files.Count}: {Path.GetFileName(file)}");
             var text = await File.ReadAllTextAsync(file);
             if (string.IsNullOrWhiteSpace(text))
             {
+                ReportProgress($"Пропуск пустого файла: {Path.GetFileName(file)}");
                 continue;
             }
 
@@ -75,45 +86,51 @@ public static partial class Day21TaskHandler
         var totalCharacters = docTexts.Sum(d => d.Content.Length);
         var estimatedPages = totalCharacters / 1800.0;
         log.AppendLine($"Суммарный объём текста: {totalCharacters:N0} символов (~{estimatedPages:F1} страниц)");
+        ReportProgress($"Подготовлено документов с текстом: {docTexts.Count}. Общий объём: {totalCharacters:N0} символов.");
 
         using var httpClient = new HttpClient
         {
             BaseAddress = new Uri("http://localhost:11434/")
         };
-        httpClient.Timeout = TimeSpan.FromMinutes(10);
+        httpClient.Timeout = TimeSpan.FromMinutes(30);
 
-        var fixedChunks = BuildFixedChunks(docTexts);
-        log.AppendLine($"Fixed-size чанков: {fixedChunks.Count}");
+        //var fixedChunks = BuildFixedChunks(docTexts);
+        //log.AppendLine($"Fixed-size чанков: {fixedChunks.Count}");
 
-        var structuredChunks = BuildStructuredChunks(docTexts);
+        ReportProgress("Запуск structured чанкинга...");
+        var structuredChunks = BuildStructuredChunks(docTexts, ReportProgress);
         log.AppendLine($"Structured чанков: {structuredChunks.Count}");
+        ReportProgress($"Structured чанкинг завершён. Получено чанков: {structuredChunks.Count}.");
 
-        await EnrichWithEmbeddingsAsync(httpClient, fixedChunks);
-        await EnrichWithEmbeddingsAsync(httpClient, structuredChunks);
+        //await EnrichWithEmbeddingsAsync(httpClient, fixedChunks);
+        ReportProgress("Начинаю построение эмбеддингов...");
+        await EnrichWithEmbeddingsAsync(httpClient, structuredChunks, ReportProgress);
+        ReportProgress("Построение эмбеддингов завершено.");
 
-        var outputDir = Path.Combine(AppContext.BaseDirectory, "Day21Indexes");
+        var outputDir = Path.Combine(AppContext.BaseDirectory, "Day31Indexes");
         Directory.CreateDirectory(outputDir);
 
-        var fixedIndex = BuildIndexResult("fixed_size", fixedChunks, totalCharacters, estimatedPages);
+        //var fixedIndex = BuildIndexResult("fixed_size", fixedChunks, totalCharacters, estimatedPages);
         var structuredIndex = BuildIndexResult("structured", structuredChunks, totalCharacters, estimatedPages);
-        var comparison = BuildComparison(fixedIndex, structuredIndex);
+        //var comparison = BuildComparison(fixedIndex, structuredIndex);
 
-        fixedIndex.Comparison = comparison;
-        structuredIndex.Comparison = comparison;
+        //fixedIndex.Comparison = comparison;
+        //structuredIndex.Comparison = comparison;
 
-        var fixedPath = Path.Combine(outputDir, "day21_index_fixed.json");
-        var structuredPath = Path.Combine(outputDir, "day21_index_structured.json");
-        var comparisonPath = Path.Combine(outputDir, "day21_chunking_comparison.json");
+        //var fixedPath = Path.Combine(outputDir, "day31_index_fixed.json");
+        var structuredPath = Path.Combine(outputDir, "day31_index_structured.json");
+        //var comparisonPath = Path.Combine(outputDir, "day31_chunking_comparison.json");
 
-        await File.WriteAllTextAsync(fixedPath, JsonSerializer.Serialize(fixedIndex, JsonOptions));
+        //await File.WriteAllTextAsync(fixedPath, JsonSerializer.Serialize(fixedIndex, JsonOptions));
         await File.WriteAllTextAsync(structuredPath, JsonSerializer.Serialize(structuredIndex, JsonOptions));
-        await File.WriteAllTextAsync(comparisonPath, JsonSerializer.Serialize(comparison, JsonOptions));
+        //await File.WriteAllTextAsync(comparisonPath, JsonSerializer.Serialize(comparison, JsonOptions));
 
         log.AppendLine();
         log.AppendLine("✅ Индексация завершена.");
-        log.AppendLine($"Fixed index: {fixedPath}");
+        //log.AppendLine($"Fixed index: {fixedPath}");
         log.AppendLine($"Structured index: {structuredPath}");
-        log.AppendLine($"Comparison: {comparisonPath}");
+        ReportProgress($"Индексация завершена. Результат: {structuredPath}");
+        //log.AppendLine($"Comparison: {comparisonPath}");
 
         return Results.Content(log.ToString());
     }
@@ -157,12 +174,13 @@ public static partial class Day21TaskHandler
         return chunks;
     }
 
-    private static List<ChunkRecord> BuildStructuredChunks(IEnumerable<DocText> docs)
+    private static List<ChunkRecord> BuildStructuredChunks(IEnumerable<DocText> docs, Action<string>? reportProgress = null)
     {
         var chunks = new List<ChunkRecord>();
 
         foreach (var doc in docs)
         {
+            reportProgress?.Invoke($"Чанкинг файла: {doc.FileName}");
             var sections = SplitSections(doc.Content);
             var index = 0;
 
@@ -194,10 +212,24 @@ public static partial class Day21TaskHandler
         return chunks;
     }
 
-    private static async Task EnrichWithEmbeddingsAsync(HttpClient httpClient, List<ChunkRecord> chunks)
+    private static async Task EnrichWithEmbeddingsAsync(HttpClient httpClient, List<ChunkRecord> chunks, Action<string>? reportProgress = null)
     {
+        string? lastFile = null;
+
         for (var i = 0; i < chunks.Count; i++)
         {
+            var chunk = chunks[i];
+            if (!string.Equals(lastFile, chunk.File, StringComparison.OrdinalIgnoreCase))
+            {
+                lastFile = chunk.File;
+                reportProgress?.Invoke($"Эмбеддинги для файла: {chunk.File}");
+            }
+
+            if ((i + 1) % 25 == 0 || i == 0 || i + 1 == chunks.Count)
+            {
+                reportProgress?.Invoke($"Эмбеддинги: {i + 1}/{chunks.Count}");
+            }
+
             chunks[i].Embedding = await GetEmbeddingAsync(httpClient, chunks[i].Text);
         }
     }
@@ -318,8 +350,7 @@ public static partial class Day21TaskHandler
             return false;
         }
 
-        return line.StartsWith("THE ONE ", StringComparison.Ordinal)
-               || line.StartsWith("[Scene:", StringComparison.Ordinal);
+        return line.StartsWith("# ", StringComparison.Ordinal);
     }
 
     private static string NormalizeText(string text)
