@@ -16,20 +16,6 @@ jobs:
           fetch-depth: 0 # Для получения diff
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "9.0.x"
-
-      - name: Restore dependencies
-        run: dotnet restore
-
-      - name: Build
-        run: dotnet build --no-restore
-
-      #- name: Test
-      #  run: dotnet test --no-build --verbosity normal
-
       - name: Fetch base branch
         run: git fetch origin ${{ github.base_ref }} --depth=1
 
@@ -80,6 +66,20 @@ jobs:
             echo "$rag_context"
             echo "EOF"
           } >> $GITHUB_OUTPUT
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore
+
+      #- name: Test
+      #  run: dotnet test --no-build --verbosity normal
 
       - name: AI Code Review
         env:
