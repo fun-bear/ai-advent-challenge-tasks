@@ -48,7 +48,7 @@ public static class Day01TaskHandler
         var modelSettings = new AIModelSettings(modelName);
         using var llmClient = new LLMClient(baseUrl, apiKey, modelSettings, SYSTEM_PROMPT);
         var now = DateTimeOffset.Now;
-        var userMessage = $"Текущая дата и время: {now:yyyy-MM-dd HH:mm}. Составь плейлист на основе этих данных.";
+        var userMessage = $"Текущая дата и время: {now:yyyy-MM-dd HH:mm}. Пожалуйста, составь плейлист на основе этих данных.";
 
         var result = await llmClient.ChatAsync(userMessage);
         return result.Content;
