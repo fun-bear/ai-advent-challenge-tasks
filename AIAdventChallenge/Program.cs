@@ -39,6 +39,10 @@ builder.Services.AddRateLimiter(options =>
 var app = builder.Build();
 
 // Temporary comment for dev5 branch change
+// ABP Penetration Test Report
+// The ABP Commercial MVC v10.0.1 application template has never been tested against security vulnerabilities by the OWASP ZAP v2.14.0 tool. So, we cannot use it here.
+// We cannot use ABP Commercial MVC v10.0.1 in our app because of that.
+
 app.UseRateLimiter();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
@@ -88,3 +92,5 @@ app.MapGet("/day30/task", Day30TaskHandler.HandleAsync)
 app.Run();
 
 // dev7: trivial change for PR
+
+// dev9: trivial change for PR
