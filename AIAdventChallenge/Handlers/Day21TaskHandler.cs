@@ -11,7 +11,7 @@ namespace AIAdventChallenge.Handlers;
 /// </summary>
 public static partial class Day21TaskHandler
 {
-    private const string SourceName = "C:\\github\\ai-advent-challenge-tasks\\ABP.Docs";
+    private const string SourceName = "C:\\github\\ai-advent-challenge-tasks\\CRM.Docs";
     private const string OllamaEmbeddingModel = "nomic-embed-text";
     private const int FixedChunkSize = 1200;
     private const int FixedChunkOverlap = 200;
@@ -350,7 +350,7 @@ public static partial class Day21TaskHandler
             return false;
         }
 
-        return line.StartsWith("# ", StringComparison.Ordinal);
+        return line.StartsWith("## ", StringComparison.Ordinal);
     }
 
     private static string NormalizeText(string text)

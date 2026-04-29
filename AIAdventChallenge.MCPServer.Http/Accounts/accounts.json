@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1001,
+    "fullName": "Иван Петров",
+    "isBlocked": false,
+    "role": "User",
+    "balance": 15200
+  },
+  {
+    "id": 1002,
+    "fullName": "Мария Смирнова",
+    "isBlocked": false,
+    "role": "Manager",
+    "balance": 48300
+  },
+  {
+    "id": 1003,
+    "fullName": "Алексей Волков",
+    "isBlocked": true,
+    "role": "User",
+    "balance": 0
+  },
+  {
+    "id": 1004,
+    "fullName": "Ольга Кузнецова",
+    "isBlocked": false,
+    "role": "Support",
+    "balance": 9700
+  },
+  {
+    "id": 1005,
+    "fullName": "Дмитрий Соколов",
+    "isBlocked": false,
+    "role": "User",
+    "balance": 2300
+  },
+  {
+    "id": 1006,
+    "fullName": "Елена Орлова",
+    "isBlocked": true,
+    "role": "User",
+    "balance": -150
+  },
+  {
+    "id": 1007,
+    "fullName": "Сергей Николаев",
+    "isBlocked": false,
+    "role": "Admin",
+    "balance": 120000
+  },
+  {
+    "id": 1008,
+    "fullName": "Анна Федорова",
+    "isBlocked": false,
+    "role": "Analyst",
+    "balance": 31100
+  },
+  {
+    "id": 1009,
+    "fullName": "Павел Морозов",
+    "isBlocked": false,
+    "role": "User",
+    "balance": 540
+  },
+  {
+    "id": 1010,
+    "fullName": "Наталья Лебедева",
+    "isBlocked": false,
+    "role": "Auditor",
+    "balance": 76500
+  }
+]
