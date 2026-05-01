@@ -13,6 +13,7 @@ builder.Services
     .AddMcpServer()
     .WithStdioServerTransport()
     .WithTools<MoonLanguareTool>()
-    .WithTools<GitTool>();
+    .WithTools<GitTool>()
+    .WithTools<FileTool>();
 
 await builder.Build().RunAsync();
