@@ -89,6 +89,7 @@ app.MapGet("/day29/task", Day29TaskHandler.HandleAsync);
 app.MapGet("/day30/task", Day30TaskHandler.HandleAsync)
     .RequireRateLimiting("day30-task-rate-limit");
 app.MapGet("/day33/task", Day33TaskHandler.HandleAsync);
+app.MapGet("/day34/task", Day34TaskHandler.HandleAsync);
 
 app.Run();
 

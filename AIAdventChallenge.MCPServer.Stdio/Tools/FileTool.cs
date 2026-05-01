@@ -8,20 +8,20 @@ public sealed class FileTool
 {
     [McpServerTool, Description("Возвращает список файлов в директории с названием, содержимым и датой изменения")]
     public static async Task<IReadOnlyCollection<FileEntry>> GetFiles(
-        [Description("Путь к директории")] string directoryPath)
+        [Description("Путь к директории")] string path)
     {
-        if (string.IsNullOrWhiteSpace(directoryPath))
+        if (string.IsNullOrWhiteSpace(path))
         {
-            throw new ArgumentException("Путь к директории не должен быть пустым.", nameof(directoryPath));
+            throw new ArgumentException("Путь к директории не должен быть пустым.", nameof(path));
         }
 
-        var fullPath = Path.GetFullPath(directoryPath);
+        var fullPath = Path.GetFullPath(path);
 
         if (!Directory.Exists(fullPath))
         {
             throw new DirectoryNotFoundException($"Директория не найдена: {fullPath}");
         }
-
+        
         var fileInfos = Directory
             .EnumerateFiles(fullPath)
             .Select(filePath => new FileInfo(filePath))
