@@ -43,13 +43,13 @@ public sealed class FileTool
 
     [McpServerTool, Description("Создает новый файл в указанной директории с переданным содержимым")]
     public static async Task<FileCreateResult> CreateFile(
-        [Description("Путь к директории")] string directoryPath,
+        [Description("Путь к директории")] string path,
         [Description("Название файла")] string fileName,
         [Description("Содержимое файла")] string content)
     {
-        if (string.IsNullOrWhiteSpace(directoryPath))
+        if (string.IsNullOrWhiteSpace(path))
         {
-            throw new ArgumentException("Путь к директории не должен быть пустым.", nameof(directoryPath));
+            throw new ArgumentException("Путь к директории не должен быть пустым.", nameof(path));
         }
 
         if (string.IsNullOrWhiteSpace(fileName))
@@ -57,7 +57,7 @@ public sealed class FileTool
             throw new ArgumentException("Название файла не должно быть пустым.", nameof(fileName));
         }
 
-        var fullDirectoryPath = Path.GetFullPath(directoryPath);
+        var fullDirectoryPath = Path.GetFullPath(path);
 
         if (!Directory.Exists(fullDirectoryPath))
         {
