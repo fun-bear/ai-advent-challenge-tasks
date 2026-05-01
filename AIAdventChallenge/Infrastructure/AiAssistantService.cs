@@ -11,7 +11,9 @@ public sealed class AiAssistantService
     private const string SystemPrompt =
         "Ты полезный AI-ассистент. Если для ответа нужны данные/действия, используй доступные инструменты. " +
         "Путь директории для операций с файлами: C:\\github\\ai-advent-challenge-tasks\\AIAdventChallenge\\Handlers. " +
-        "Работать с файлами нужно в этой директории.";
+        "Работать с файлами нужно в этой директории." +
+        "Путь директории для новых созданных файлов: C:\\github\\ai-advent-challenge-tasks\\AIAdventChallenge\\Reports." +
+        "При сохранении нового файла генерируй для него оригинальное название (с GUID), расширение: md.";
 
     public async Task<string> ProcessMessageAsync(
         IConfiguration configuration,
