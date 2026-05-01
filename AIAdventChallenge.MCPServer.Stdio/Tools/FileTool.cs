@@ -41,5 +41,38 @@ public sealed class FileTool
         return files;
     }
 
+    [McpServerTool, Description("Создает новый файл в указанной директории с переданным содержимым")]
+    public static async Task<FileCreateResult> CreateFile(
+        [Description("Путь к директории")] string directoryPath,
+        [Description("Название файла")] string fileName,
+        [Description("Содержимое файла")] string content)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+        {
+            throw new ArgumentException("Путь к директории не должен быть пустым.", nameof(directoryPath));
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            throw new ArgumentException("Название файла не должно быть пустым.", nameof(fileName));
+        }
+
+        var fullDirectoryPath = Path.GetFullPath(directoryPath);
+
+        if (!Directory.Exists(fullDirectoryPath))
+        {
+            throw new DirectoryNotFoundException($"Директория не найдена: {fullDirectoryPath}");
+        }
+
+        var fullFilePath = Path.Combine(fullDirectoryPath, fileName);
+        await File.WriteAllTextAsync(fullFilePath, content ?? string.Empty);
+
+        return new FileCreateResult(
+            Name: Path.GetFileName(fullFilePath),
+            FullPath: fullFilePath,
+            Created: true);
+    }
+
     public sealed record FileEntry(string Name, string Content, DateTime LastModified);
+    public sealed record FileCreateResult(string Name, string FullPath, bool Created);
 }
