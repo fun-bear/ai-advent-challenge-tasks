@@ -58,3 +58,5 @@ AIAdventChallenge/Properties/launchSettings.json
 AIAdventChallenge.MCPServer.Http/Day31Indexes/day31_index_structured.json
 AIAdventChallenge.MCPServer.Http/Day31Indexes/day31_index_structured_old.json
 AIAdventChallenge/Reports/report-0f4b8c0e-9e5e-4dc3-9d8c-0c6f9b8c9f0a.md
+.claude/settings.json
+.claude/settings.local.json

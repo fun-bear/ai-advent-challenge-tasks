@@ -14,6 +14,7 @@ builder.Services
     .WithStdioServerTransport()
     .WithTools<MoonLanguareTool>()
     .WithTools<GitTool>()
-    .WithTools<FileTool>();
+    .WithTools<FileTool>()
+    .WithTools<ContractValidatorTool>();
 
 await builder.Build().RunAsync();

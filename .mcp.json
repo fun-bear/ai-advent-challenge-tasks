@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "ai-advent-stdio": {
+      "type": "stdio",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "c:\\github\\ai-advent-challenge-tasks\\AIAdventChallenge.MCPServer.Stdio\\AIAdventChallenge.MCPServer.Stdio.csproj"
+      ]
+    }
+  }
+}
